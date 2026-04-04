@@ -1,65 +1,347 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+const MLB_TEAMS = [
+  // AL EAST
+  { espnId: "2",  name: "Red Sox",      abbreviation: "BOS", city: "Boston",        color: "#BD3039", league: "AL", division: "AL East" },
+  { espnId: "10", name: "Yankees",       abbreviation: "NYY", city: "New York",      color: "#003087", league: "AL", division: "AL East" },
+  { espnId: "1",  name: "Blue Jays",     abbreviation: "TOR", city: "Toronto",       color: "#134A8E", league: "AL", division: "AL East" },
+  { espnId: "21", name: "Orioles",       abbreviation: "BAL", city: "Baltimore",     color: "#DF4601", league: "AL", division: "AL East" },
+  { espnId: "30", name: "Rays",          abbreviation: "TB",  city: "Tampa Bay",     color: "#092C5C", league: "AL", division: "AL East" },
+  // AL CENTRAL
+  { espnId: "5",  name: "Guardians",     abbreviation: "CLE", city: "Cleveland",     color: "#00385D", league: "AL", division: "AL Central" },
+  { espnId: "7",  name: "Royals",        abbreviation: "KC",  city: "Kansas City",   color: "#004687", league: "AL", division: "AL Central" },
+  { espnId: "9",  name: "Twins",         abbreviation: "MIN", city: "Minnesota",     color: "#002B5C", league: "AL", division: "AL Central" },
+  { espnId: "24", name: "Tigers",        abbreviation: "DET", city: "Detroit",       color: "#0C2340", league: "AL", division: "AL Central" },
+  { espnId: "13", name: "White Sox",     abbreviation: "CHW", city: "Chicago",       color: "#27251F", league: "AL", division: "AL Central" },
+  // AL WEST
+  { espnId: "18", name: "Rangers",       abbreviation: "TEX", city: "Texas",         color: "#003278", league: "AL", division: "AL West" },
+  { espnId: "6",  name: "Astros",        abbreviation: "HOU", city: "Houston",       color: "#002D62", league: "AL", division: "AL West" },
+  { espnId: "27", name: "Mariners",      abbreviation: "SEA", city: "Seattle",       color: "#0C2C56", league: "AL", division: "AL West" },
+  { espnId: "3",  name: "Angels",        abbreviation: "LAA", city: "Los Angeles",   color: "#BA0021", league: "AL", division: "AL West" },
+  { espnId: "11", name: "Athletics",     abbreviation: "ATH", city: "Oakland",       color: "#003831", league: "AL", division: "AL West" },
+  // NL EAST
+  { espnId: "12", name: "Braves",        abbreviation: "ATL", city: "Atlanta",       color: "#13274F", league: "NL", division: "NL East" },
+  { espnId: "16", name: "Phillies",      abbreviation: "PHI", city: "Philadelphia",  color: "#E81828", league: "NL", division: "NL East" },
+  { espnId: "15", name: "Mets",          abbreviation: "NYM", city: "New York",      color: "#002D72", league: "NL", division: "NL East" },
+  { espnId: "20", name: "Nationals",     abbreviation: "WSH", city: "Washington",    color: "#AB0003", league: "NL", division: "NL East" },
+  { espnId: "28", name: "Marlins",       abbreviation: "MIA", city: "Miami",         color: "#00A3E0", league: "NL", division: "NL East" },
+  // NL CENTRAL
+  { espnId: "8",  name: "Brewers",       abbreviation: "MIL", city: "Milwaukee",     color: "#12284B", league: "NL", division: "NL Central" },
+  { espnId: "4",  name: "Cubs",          abbreviation: "CHC", city: "Chicago",       color: "#0E3386", league: "NL", division: "NL Central" },
+  { espnId: "25", name: "Cardinals",     abbreviation: "STL", city: "St. Louis",     color: "#C41E3A", league: "NL", division: "NL Central" },
+  { espnId: "17", name: "Reds",          abbreviation: "CIN", city: "Cincinnati",    color: "#C6011F", league: "NL", division: "NL Central" },
+  { espnId: "23", name: "Pirates",       abbreviation: "PIT", city: "Pittsburgh",    color: "#27251F", league: "NL", division: "NL Central" },
+  // NL WEST
+  { espnId: "19", name: "Dodgers",       abbreviation: "LAD", city: "Los Angeles",   color: "#005A9C", league: "NL", division: "NL West" },
+  { espnId: "29", name: "Diamondbacks",  abbreviation: "ARI", city: "Arizona",       color: "#A71930", league: "NL", division: "NL West" },
+  { espnId: "26", name: "Giants",        abbreviation: "SF",  city: "San Francisco", color: "#FD5A1E", league: "NL", division: "NL West" },
+  { espnId: "33", name: "Rockies",       abbreviation: "COL", city: "Colorado",      color: "#333366", league: "NL", division: "NL West" },
+  { espnId: "22", name: "Padres",        abbreviation: "SD",  city: "San Diego",     color: "#2F241D", league: "NL", division: "NL West" },
+] as const;
+
+type Division = "AL East" | "AL Central" | "AL West" | "NL East" | "NL Central" | "NL West";
+const DIVISIONS: Division[] = ["AL East", "AL Central", "AL West", "NL East", "NL Central", "NL West"];
+
+function TeamBubble({
+  team,
+  onClick,
+}: {
+  team: (typeof MLB_TEAMS)[number];
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "9px",
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: "6px 4px",
+        borderRadius: "12px",
+        transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+        transform: hovered ? "translateY(-4px) scale(1.05)" : "translateY(0) scale(1)",
+        outline: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {/* Circle bubble */}
+      <div
+        style={{
+          width: "72px",
+          height: "72px",
+          borderRadius: "50%",
+          background: hovered ? `${team.color}10` : "#f4f4f5",
+          border: `2px solid ${hovered ? team.color : "#e4e4e7"}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: hovered ? `0 4px 16px ${team.color}28` : "none",
+          transition: "all 0.18s ease",
+        }}
+      >
+        {/*
+         * LOGO PLACEHOLDER
+         * When you have logos ready, replace this entire inner div with:
+         *
+         * <Image
+         *   src={`/logos/${team.abbreviation.toLowerCase()}.png`}
+         *   alt={team.name}
+         *   width={48}
+         *   height={48}
+         *   style={{ objectFit: "contain" }}
+         * />
+         */}
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            background: `${team.color}15`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'Oswald', sans-serif",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: team.color,
+              letterSpacing: "0.03em",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {team.abbreviation}
+          </span>
         </div>
-      </main>
-    </div>
+      </div>
+
+      {/* Team name */}
+      <div style={{ textAlign: "center", lineHeight: 1.25 }}>
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            fontFamily: "'Oswald', sans-serif",
+            letterSpacing: "0.04em",
+            color: hovered ? team.color : "#18181b",
+            transition: "color 0.15s ease",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {team.name}
+        </div>
+        <div
+          style={{
+            fontSize: "10px",
+            color: "#a1a1aa",
+            fontFamily: "'DM Sans', sans-serif",
+            marginTop: "1px",
+          }}
+        >
+          {team.city}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+export default function TeamSelectorPage() {
+  const router = useRouter();
+  const [activeLeague, setActiveLeague] = useState<"ALL" | "AL" | "NL">("ALL");
+
+  const filteredDivisions = DIVISIONS.filter((div) =>
+    activeLeague === "ALL" ? true : div.startsWith(activeLeague)
+  );
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { background: #fafafa; }
+
+        .page {
+          min-height: 100vh;
+          background: #fafafa;
+          padding: 56px 24px 80px;
+        }
+
+        .inner {
+          max-width: 880px;
+          margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+          text-align: center;
+          margin-bottom: 40px;
+        }
+
+        .eyebrow {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #a1a1aa;
+          margin-bottom: 10px;
+        }
+
+        .headline {
+          font-family: 'Oswald', sans-serif;
+          font-size: clamp(30px, 5vw, 50px);
+          font-weight: 700;
+          color: #18181b;
+          letter-spacing: -0.01em;
+          line-height: 1.05;
+          margin-bottom: 10px;
+        }
+
+        .headline em {
+          font-style: normal;
+          color: #e8291c;
+        }
+
+        .subhead {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 14px;
+          color: #71717a;
+          font-weight: 300;
+        }
+
+        /* League toggle */
+        .toggle-wrap {
+          display: flex;
+          justify-content: center;
+          gap: 6px;
+          margin-bottom: 44px;
+        }
+
+        .toggle-btn {
+          font-family: 'Oswald', sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.07em;
+          padding: 7px 20px;
+          border-radius: 100px;
+          border: 1.5px solid #e4e4e7;
+          background: #fff;
+          color: #71717a;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .toggle-btn:hover {
+          border-color: #a1a1aa;
+          color: #18181b;
+        }
+
+        .toggle-btn.active {
+          background: #18181b;
+          border-color: #18181b;
+          color: #fff;
+        }
+
+        /* Division section */
+        .division-block {
+          margin-bottom: 32px;
+        }
+
+        .division-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #a1a1aa;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .division-label::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #e4e4e7;
+        }
+
+        /* Teams grid */
+        .teams-row {
+          display: flex;
+          gap: 4px;
+          flex-wrap: wrap;
+        }
+
+        .team-slot {
+          flex: 1;
+          min-width: 86px;
+          max-width: 120px;
+          display: flex;
+          justify-content: center;
+        }
+
+        @media (max-width: 540px) {
+          .team-slot { min-width: 72px; }
+          .page { padding: 36px 16px 60px; }
+        }
+      `}</style>
+
+      <div className="page">
+        <div className="inner">
+
+          <div className="header">
+            <p className="eyebrow">MLB · 2025 Season</p>
+            <h1 className="headline">Choose Your <em>Team</em></h1>
+            <p className="subhead">Scores, stats &amp; news — all in one feed</p>
+          </div>
+
+          <div className="toggle-wrap">
+            {(["ALL", "AL", "NL"] as const).map((l) => (
+              <button
+                key={l}
+                className={`toggle-btn ${activeLeague === l ? "active" : ""}`}
+                onClick={() => setActiveLeague(l)}
+              >
+                {l === "ALL" ? "All Teams" : l === "AL" ? "American League" : "National League"}
+              </button>
+            ))}
+          </div>
+
+          {filteredDivisions.map((division) => {
+            const teams = MLB_TEAMS.filter((t) => t.division === division);
+            return (
+              <div key={division} className="division-block">
+                <div className="division-label">{division}</div>
+                <div className="teams-row">
+                  {teams.map((team) => (
+                    <div key={team.espnId} className="team-slot">
+                      <TeamBubble
+                        team={team}
+                        onClick={() => router.push(`/team/${team.espnId}`)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+        </div>
+      </div>
+    </>
   );
 }
