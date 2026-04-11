@@ -234,6 +234,349 @@ function useGameData(teamId: string) {
 
   return { gameData, loading };
 }
+// ─── Live Game Panel ──────────────────────────────────────────────────────────
+interface LiveData {
+  currentPitcher: { name: string; summary: string };
+  currentBatter:  { name: string; summary: string };
+  bases:          { first: boolean; second: boolean; third: boolean };
+  count:          { balls: number; strikes: number; outs: number };
+  inningDetail:   string;   // "Bottom 4th"
+  currentInning:  number;
+  lastPlay:       string | null;
+  gamePk:         string | null;
+}
+
+function useESPNGamePk(teamId: string, isLive: boolean) {
+  const [gamePk, setGamePk] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLive) return;
+    async function fetchPk() {
+      try {
+        const res = await fetch(
+          "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+        );
+        const json = await res.json();
+        const events: any[] = json.events ?? [];
+        const todayGame = events.find((ev) =>
+          ev.competitions?.[0]?.competitors?.some(
+            (c: any) => c.id === teamId || c.team?.id === teamId
+          )
+        );
+        if (todayGame) {
+          // ESPN event IDs map 1:1 to MLB Stats API gamePks
+          setGamePk(todayGame.id);
+        }
+      } catch (e) {
+        console.error("Failed to fetch gamePk", e);
+      }
+    }
+    fetchPk();
+  }, [teamId, isLive]);
+
+  return gamePk;
+}
+
+function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData | null; loading: boolean } {
+  const [liveData, setLiveData] = useState<LiveData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLive) {
+      setLoading(false);
+      return;
+    }
+
+    async function fetchLive() {
+      try {
+        const res = await fetch(
+          "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+        );
+        const json = await res.json();
+        const events: any[] = json.events ?? [];
+
+        const event = events.find((ev) =>
+          ev.competitions?.[0]?.competitors?.some(
+            (c: any) => c.id === teamId || c.team?.id === teamId
+          )
+        );
+
+        if (!event) {
+          setLiveData(null);
+          setLoading(false);
+          return;
+        }
+
+        const comp = event.competitions[0];
+        const situation = comp.situation ?? {};
+        const status = comp.status ?? {};
+
+        // ── Pitcher ──
+        // name comes from athlete.displayName
+        // stats come from pitcher.summary e.g. "3.1 IP, 3 ER, 3 H, 5 K, 3 BB"
+        const pitcherAthlete = situation.pitcher?.athlete ?? null;
+        const pitcherSummary: string = situation.pitcher?.summary ?? "";
+
+        // ── Batter ──
+        // stats come from batter.summary e.g. "0-2, 2 K"
+        const batterAthlete = situation.batter?.athlete ?? null;
+        const batterSummary: string = situation.batter?.summary ?? "";
+
+        // ── Bases ──
+        // onFirst/onSecond/onThird are booleans directly on situation
+        const bases = {
+          first:  !!situation.onFirst,
+          second: !!situation.onSecond,
+          third:  !!situation.onThird,
+        };
+
+        // ── Count ──
+        // balls, strikes, outs are directly on situation
+        const count = {
+          balls:   situation.balls   ?? 0,
+          strikes: situation.strikes ?? 0,
+          outs:    situation.outs    ?? 0,
+        };
+
+        // ── Inning ──
+        // "Bottom 4th" is at status.type.detail
+        // "Bot 4th" is at status.type.shortDetail
+        const inningDetail: string = status.type?.detail ?? "";
+        const currentInning: number = status.period ?? 0;
+
+        // ── Last play ──
+        // situation.lastPlay.text e.g. "Brandon Pfaadt pitches to Trea Turner"
+        const lastPlay: string | null = situation.lastPlay?.text ?? null;
+
+        setLiveData({
+          currentPitcher: {
+            name:       pitcherAthlete?.displayName ?? "—",
+            summary:    pitcherSummary,   // "3.1 IP, 3 ER, 3 H, 5 K, 3 BB"
+          },
+          currentBatter: {
+            name:       batterAthlete?.displayName ?? "—",
+            summary:    batterSummary,    // "0-2, 2 K"
+          },
+          bases,
+          count,
+          inningDetail,
+          currentInning,
+          lastPlay,
+          gamePk: String(event.id),
+        });
+      } catch (e) {
+        console.error("ESPN live fetch failed", e);
+        setLiveData(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLive();
+    const interval = setInterval(fetchLive, 15000);
+    return () => clearInterval(interval);
+  }, [teamId, isLive]);
+
+  return { liveData, loading };
+}
+function BaseDiamond({ bases }: { bases: { first: boolean; second: boolean; third: boolean } }) {
+  const color = "var(--color)";
+  const empty = "#e4e4e7";
+  return (
+    <svg width="54" height="54" viewBox="0 0 54 54" style={{ flexShrink: 0 }}>
+      {/* Second base — top */}
+      <rect
+        x="19" y="2" width="16" height="16"
+        rx="2"
+        transform="rotate(45 27 10)"
+        fill={bases.second ? color : empty}
+      />
+      {/* Third base — left */}
+      <rect
+        x="2" y="19" width="16" height="16"
+        rx="2"
+        transform="rotate(45 10 27)"
+        fill={bases.third ? color : empty}
+      />
+      {/* First base — right */}
+      <rect
+        x="36" y="19" width="16" height="16"
+        rx="2"
+        transform="rotate(45 44 27)"
+        fill={bases.first ? color : empty}
+      />
+    </svg>
+  );
+}
+
+function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) {
+  const { liveData, loading } = useLiveGameData(teamId, isLive);
+
+  if (!isLive) return null;
+  if (loading) {
+    return (
+      <div className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="skeleton" style={{ width: 120, height: 12 }} />
+        <div className="skeleton" style={{ width: "100%", height: 80 }} />
+        <div className="skeleton" style={{ width: "80%", height: 80 }} />
+      </div>
+    );
+  }
+  if (!liveData) return null;
+
+  const { currentPitcher, currentBatter, bases, count, inningDetail, lastPlay } = liveData;
+
+  return (
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* ── Header: inning + count ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{
+          fontFamily: "'Oswald', sans-serif",
+          fontSize: 13, fontWeight: 600,
+          color: "var(--color)", letterSpacing: "0.04em",
+          textTransform: "uppercase"
+        }}>
+          {inningDetail}
+        </span>
+        <span style={{
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: 11, color: "#71717a", fontWeight: 500
+        }}>
+          {count.balls}-{count.strikes} &nbsp;·&nbsp; {count.outs} {count.outs === 1 ? "out" : "outs"}
+        </span>
+      </div>
+
+      {/* ── Main row: pitcher | diamond | batter ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+
+        {/* Pitcher */}
+        <div style={{ flex: 1, background: "var(--faint)", borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5
+          }}>
+            Pitching
+          </div>
+          <div style={{
+            fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600,
+            color: "#18181b", lineHeight: 1.2, marginBottom: 6
+          }}>
+            {currentPitcher.name}
+          </div>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 11,
+            color: "#71717a", lineHeight: 1.4
+          }}>
+            {currentPitcher.summary}
+          </div>
+        </div>
+
+        {/* Base diamond */}
+        <BaseDiamond bases={bases} />
+
+        {/* Batter */}
+        <div style={{ flex: 1, background: "var(--faint)", borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5
+          }}>
+            At Bat
+          </div>
+          <div style={{
+            fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600,
+            color: "#18181b", lineHeight: 1.2, marginBottom: 6
+          }}>
+            {currentBatter.name}
+          </div>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 11,
+            color: "#71717a", lineHeight: 1.4
+          }}>
+            {currentBatter.summary}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── Last play ── */}
+      {lastPlay && (
+        <div style={{
+          paddingTop: 12, borderTop: "1px solid #f4f4f5",
+          fontFamily: "'DM Sans', sans-serif", fontSize: 12,
+          color: "#71717a", lineHeight: 1.5
+        }}>
+          <span style={{
+            fontWeight: 600, color: "#a1a1aa",
+            textTransform: "uppercase", fontSize: 9, letterSpacing: "0.1em"
+          }}>
+            Last Play ·{" "}
+          </span>
+          {lastPlay}
+        </div>
+      )}
+      {/* ── Count indicators ── */}
+      <div style={{
+        paddingTop: 12, borderTop: "1px solid #f4f4f5",
+        display: "flex", alignItems: "center", justifyContent: "space-around",
+      }}>
+
+        {/* Balls */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", gap: 5 }}>
+            {[0,1,2,3].map((i) => (
+              <div key={i} style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: i < count.balls ? "#16a34a" : "#e4e4e7",
+                transition: "background 0.2s",
+              }} />
+            ))}
+          </div>
+          <span style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
+          }}>Balls</span>
+        </div>
+
+        {/* Strikes */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", gap: 5 }}>
+            {[0,1,2].map((i) => (
+              <div key={i} style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: i < count.strikes ? "#dc2626" : "#e4e4e7",
+                transition: "background 0.2s",
+              }} />
+            ))}
+          </div>
+          <span style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
+          }}>Strikes</span>
+        </div>
+
+        {/* Outs */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", gap: 5 }}>
+            {[0,1,2].map((i) => (
+              <div key={i} style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: i < count.outs ? "#f59e0b" : "#e4e4e7",
+                transition: "background 0.2s",
+              }} />
+            ))}
+          </div>
+          <span style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
+          }}>Outs</span>
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function TeamFeedPage() {
@@ -621,7 +964,12 @@ export default function TeamFeedPage() {
               </div>
             )}
           </div>
-
+          {gameData?.status === "Live" && (
+            <div>
+              <p className="section-label">Live · In-Game</p>
+              <LiveGamePanel teamId={teamId} isLive={true} />
+            </div>
+          )}
           {/* ── Stat ── */}
           <div>
             <p className="section-label">Team Stat</p>
