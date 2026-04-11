@@ -2,53 +2,57 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import { useState, useEffect } from "react";
 
 // ─── Team data ───────────────────────────────────────────────────────────────
 const MLB_TEAMS = [
   { espnId: "2",  name: "Red Sox",      abbreviation: "BOS", city: "Boston",        color: "#BD3039", league: "AL", division: "AL East" },
-  { espnId: "10", name: "Yankees",       abbreviation: "NYY", city: "New York",      color: "#003087", league: "AL", division: "AL East" },
-  { espnId: "1",  name: "Blue Jays",     abbreviation: "TOR", city: "Toronto",       color: "#134A8E", league: "AL", division: "AL East" },
-  { espnId: "21", name: "Orioles",       abbreviation: "BAL", city: "Baltimore",     color: "#DF4601", league: "AL", division: "AL East" },
-  { espnId: "30", name: "Rays",          abbreviation: "TB",  city: "Tampa Bay",     color: "#092C5C", league: "AL", division: "AL East" },
-  { espnId: "5",  name: "Guardians",     abbreviation: "CLE", city: "Cleveland",     color: "#00385D", league: "AL", division: "AL Central" },
-  { espnId: "7",  name: "Royals",        abbreviation: "KC",  city: "Kansas City",   color: "#004687", league: "AL", division: "AL Central" },
-  { espnId: "9",  name: "Twins",         abbreviation: "MIN", city: "Minnesota",     color: "#002B5C", league: "AL", division: "AL Central" },
-  { espnId: "24", name: "Tigers",        abbreviation: "DET", city: "Detroit",       color: "#0C2340", league: "AL", division: "AL Central" },
-  { espnId: "13", name: "White Sox",     abbreviation: "CHW", city: "Chicago",       color: "#27251F", league: "AL", division: "AL Central" },
-  { espnId: "18", name: "Rangers",       abbreviation: "TEX", city: "Texas",         color: "#003278", league: "AL", division: "AL West" },
-  { espnId: "6",  name: "Astros",        abbreviation: "HOU", city: "Houston",       color: "#002D62", league: "AL", division: "AL West" },
-  { espnId: "27", name: "Mariners",      abbreviation: "SEA", city: "Seattle",       color: "#0C2C56", league: "AL", division: "AL West" },
-  { espnId: "3",  name: "Angels",        abbreviation: "LAA", city: "Los Angeles",   color: "#BA0021", league: "AL", division: "AL West" },
-  { espnId: "11", name: "Athletics",     abbreviation: "ATH", city: "Oakland",       color: "#003831", league: "AL", division: "AL West" },
-  { espnId: "12", name: "Braves",        abbreviation: "ATL", city: "Atlanta",       color: "#13274F", league: "NL", division: "NL East" },
-  { espnId: "16", name: "Phillies",      abbreviation: "PHI", city: "Philadelphia",  color: "#E81828", league: "NL", division: "NL East" },
-  { espnId: "15", name: "Mets",          abbreviation: "NYM", city: "New York",      color: "#002D72", league: "NL", division: "NL East" },
-  { espnId: "20", name: "Nationals",     abbreviation: "WSH", city: "Washington",    color: "#AB0003", league: "NL", division: "NL East" },
-  { espnId: "28", name: "Marlins",       abbreviation: "MIA", city: "Miami",         color: "#00A3E0", league: "NL", division: "NL East" },
-  { espnId: "8",  name: "Brewers",       abbreviation: "MIL", city: "Milwaukee",     color: "#12284B", league: "NL", division: "NL Central" },
-  { espnId: "4",  name: "Cubs",          abbreviation: "CHC", city: "Chicago",       color: "#0E3386", league: "NL", division: "NL Central" },
-  { espnId: "25", name: "Cardinals",     abbreviation: "STL", city: "St. Louis",     color: "#C41E3A", league: "NL", division: "NL Central" },
-  { espnId: "17", name: "Reds",          abbreviation: "CIN", city: "Cincinnati",    color: "#C6011F", league: "NL", division: "NL Central" },
-  { espnId: "23", name: "Pirates",       abbreviation: "PIT", city: "Pittsburgh",    color: "#27251F", league: "NL", division: "NL Central" },
-  { espnId: "19", name: "Dodgers",       abbreviation: "LAD", city: "Los Angeles",   color: "#005A9C", league: "NL", division: "NL West" },
-  { espnId: "29", name: "Diamondbacks",  abbreviation: "ARI", city: "Arizona",       color: "#A71930", league: "NL", division: "NL West" },
-  { espnId: "26", name: "Giants",        abbreviation: "SF",  city: "San Francisco", color: "#FD5A1E", league: "NL", division: "NL West" },
-  { espnId: "33", name: "Rockies",       abbreviation: "COL", city: "Colorado",      color: "#333366", league: "NL", division: "NL West" },
-  { espnId: "22", name: "Padres",        abbreviation: "SD",  city: "San Diego",     color: "#2F241D", league: "NL", division: "NL West" },
+  { espnId: "10", name: "Yankees",      abbreviation: "NYY", city: "New York",      color: "#003087", league: "AL", division: "AL East" },
+  { espnId: "14",  name: "Blue Jays",    abbreviation: "TOR", city: "Toronto",       color: "#134A8E", league: "AL", division: "AL East" },
+  { espnId: "1", name: "Orioles",      abbreviation: "BAL", city: "Baltimore",     color: "#DF4601", league: "AL", division: "AL East" },
+  { espnId: "30", name: "Rays",         abbreviation: "TB",  city: "Tampa Bay",     color: "#092C5C", league: "AL", division: "AL East" },
+  { espnId: "5",  name: "Guardians",    abbreviation: "CLE", city: "Cleveland",     color: "#00385D", league: "AL", division: "AL Central" },
+  { espnId: "7",  name: "Royals",       abbreviation: "KC",  city: "Kansas City",   color: "#004687", league: "AL", division: "AL Central" },
+  { espnId: "9",  name: "Twins",        abbreviation: "MIN", city: "Minnesota",     color: "#002B5C", league: "AL", division: "AL Central" },
+  { espnId: "6", name: "Tigers",       abbreviation: "DET", city: "Detroit",       color: "#0C2340", league: "AL", division: "AL Central" },
+  { espnId: "4", name: "White Sox",    abbreviation: "CHW", city: "Chicago",       color: "#27251F", league: "AL", division: "AL Central" },
+  { espnId: "13", name: "Rangers",      abbreviation: "TEX", city: "Texas",         color: "#003278", league: "AL", division: "AL West" },
+  { espnId: "18",  name: "Astros",       abbreviation: "HOU", city: "Houston",       color: "#002D62", league: "AL", division: "AL West" },
+  { espnId: "12", name: "Mariners",     abbreviation: "SEA", city: "Seattle",       color: "#0C2C56", league: "AL", division: "AL West" },
+  { espnId: "3",  name: "Angels",       abbreviation: "LAA", city: "Los Angeles",   color: "#BA0021", league: "AL", division: "AL West" },
+  { espnId: "11", name: "Athletics",    abbreviation: "ATH", city: "Oakland",       color: "#003831", league: "AL", division: "AL West" },
+  { espnId: "15", name: "Braves",       abbreviation: "ATL", city: "Atlanta",       color: "#13274F", league: "NL", division: "NL East" },
+  { espnId: "22", name: "Phillies",     abbreviation: "PHI", city: "Philadelphia",  color: "#E81828", league: "NL", division: "NL East" },
+  { espnId: "21", name: "Mets",         abbreviation: "NYM", city: "New York",      color: "#002D72", league: "NL", division: "NL East" },
+  { espnId: "20", name: "Nationals",    abbreviation: "WSH", city: "Washington",    color: "#AB0003", league: "NL", division: "NL East" },
+  { espnId: "28", name: "Marlins",      abbreviation: "MIA", city: "Miami",         color: "#00A3E0", league: "NL", division: "NL East" },
+  { espnId: "8",  name: "Brewers",      abbreviation: "MIL", city: "Milwaukee",     color: "#12284B", league: "NL", division: "NL Central" },
+  { espnId: "16",  name: "Cubs",         abbreviation: "CHC", city: "Chicago",       color: "#0E3386", league: "NL", division: "NL Central" },
+  { espnId: "24", name: "Cardinals",    abbreviation: "STL", city: "St. Louis",     color: "#C41E3A", league: "NL", division: "NL Central" },
+  { espnId: "17", name: "Reds",         abbreviation: "CIN", city: "Cincinnati",    color: "#C6011F", league: "NL", division: "NL Central" },
+  { espnId: "23", name: "Pirates",      abbreviation: "PIT", city: "Pittsburgh",    color: "#27251F", league: "NL", division: "NL Central" },
+  { espnId: "19", name: "Dodgers",      abbreviation: "LAD", city: "Los Angeles",   color: "#005A9C", league: "NL", division: "NL West" },
+  { espnId: "29", name: "Diamondbacks", abbreviation: "ARI", city: "Arizona",       color: "#A71930", league: "NL", division: "NL West" },
+  { espnId: "26", name: "Giants",       abbreviation: "SF",  city: "San Francisco", color: "#FD5A1E", league: "NL", division: "NL West" },
+  { espnId: "27", name: "Rockies",      abbreviation: "COL", city: "Colorado",      color: "#333366", league: "NL", division: "NL West" },
+  { espnId: "25", name: "Padres",       abbreviation: "SD",  city: "San Diego",     color: "#2F241D", league: "NL", division: "NL West" },
 ] as const;
 
-// ─── Mock data — replace with real API calls per section ─────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+type GameStatus = "Final" | "Live" | "Scheduled";
 
-const MOCK_GAME = {
-  status: "Final" as "Final" | "Live" | "Upcoming",
-  inning: null as string | null,
-  homeTeam: { abbreviation: "BOS", score: 6 },
-  awayTeam: { abbreviation: "NYY", score: 4 },
-  date: "Apr 3, 2025",
-  venue: "Fenway Park",
-  result: "W" as "W" | "L" | null,
-};
+interface GameData {
+  status: GameStatus;
+  inning: string | null;
+  homeTeam: { abbreviation: string; score: number | null };
+  awayTeam: { abbreviation: string; score: number | null };
+  date: string;
+  venue: string;
+  result: "W" | "L" | null; // relative to the page's team
+  isToday: boolean;
+}
 
+// ─── Mock data (stat / articles / fact / reddit unchanged) ────────────────────
 const MOCK_STAT = {
   label: "Team ERA",
   value: "3.41",
@@ -87,13 +91,157 @@ const MOCK_REDDIT = {
   time: "4h ago",
 };
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Helper: parse a competition object into GameData ────────────────────────
+function parseCompetition(
+  comp: any,
+  teamId: string,
+  isToday: boolean
+): GameData {
+  const home = comp.competitors.find((c: any) => c.homeAway === "home");
+  const away = comp.competitors.find((c: any) => c.homeAway === "away");
+  const statusState: string = comp.status?.type?.state ?? "pre";
+  const statusName: string = comp.status?.type?.name ?? "";
 
+  let status: GameStatus = "Scheduled";
+  if (statusState === "in") status = "Live";
+  else if (statusState === "post") status = "Final";
+
+  // Inning display for live games
+  let inning: string | null = null;
+  if (status === "Live") {
+    const period = comp.status?.period ?? "";
+    const detail = comp.status?.type?.detail ?? "";
+    inning = detail || (period ? `Inning ${period}` : null);
+  }
+
+  const homeScore = home?.score != null ? parseInt(home.score, 10) : null;
+  const awayScore = away?.score != null ? parseInt(away.score, 10) : null;
+
+  // Determine W/L from the page team's perspective
+  let result: "W" | "L" | null = null;
+  if (status === "Final" && homeScore != null && awayScore != null) {
+    const pageTeamIsHome = home?.id === teamId || home?.team?.id === teamId;
+    const pageTeamScore = pageTeamIsHome ? homeScore : awayScore;
+    const opponentScore = pageTeamIsHome ? awayScore : homeScore;
+    result = pageTeamScore > opponentScore ? "W" : "L";
+  }
+
+  // Date formatting
+  const rawDate = comp.date ?? comp.startDate ?? "";
+  const dateStr = rawDate
+    ? new Date(rawDate).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "TBD";
+
+  // Scheduled time for display
+  let displayDate = dateStr;
+  if (status === "Scheduled" && rawDate) {
+    const timeStr = new Date(rawDate).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+    displayDate = `${dateStr} · ${timeStr}`;
+  }
+
+  return {
+    status,
+    inning,
+    homeTeam: {
+      abbreviation: home?.team?.abbreviation ?? home?.abbreviation ?? "???",
+      score: homeScore,
+    },
+    awayTeam: {
+      abbreviation: away?.team?.abbreviation ?? away?.abbreviation ?? "???",
+      score: awayScore,
+    },
+    date: displayDate,
+    venue: comp.venue?.fullName ?? "TBD",
+    result,
+    isToday,
+  };
+}
+
+// ─── Hook: fetch game data ────────────────────────────────────────────────────
+function useGameData(teamId: string) {
+  const [gameData, setGameData] = useState<GameData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!teamId) return;
+
+    async function load() {
+      setLoading(true);
+      try {
+        // Step 1 — check today's scoreboard for this team
+        const scoreboardRes = await fetch(
+          "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+        );
+        const scoreboardJson = await scoreboardRes.json();
+        const todayEvents: any[] = scoreboardJson.events ?? [];
+
+        const todayGame = todayEvents.find((ev) =>
+          ev.competitions?.[0]?.competitors?.some(
+            (c: any) => c.id === teamId || c.team?.id === teamId
+          )
+        );
+
+        if (todayGame) {
+          setGameData(parseCompetition(todayGame.competitions[0], teamId, true));
+          setLoading(false);
+          return;
+        }
+
+        // Step 2 — no game today; pull team schedule for most recent completed game
+        const teamRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}/schedule`
+        );
+        const teamJson = await teamRes.json();
+        const events: any[] = teamJson.events ?? [];
+
+        // Find the last completed game
+        const completed = events
+          .filter(
+            (ev) =>
+              ev.competitions?.[0]?.status?.type?.state === "post"
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.date ?? b.competitions[0].date).getTime() -
+              new Date(a.date ?? a.competitions[0].date).getTime()
+          );
+
+        if (completed.length > 0) {
+          setGameData(
+            parseCompetition(completed[0].competitions[0], teamId, false)
+          );
+        } else {
+          setGameData(null);
+        }
+      } catch (err) {
+        console.error("Failed to load game data", err);
+        setGameData(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [teamId]);
+
+  return { gameData, loading };
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function TeamFeedPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
+  const { gameData, loading: gameLoading } = useGameData(teamId);
 
   if (!team) {
     return (
@@ -106,7 +254,7 @@ export default function TeamFeedPage() {
     );
   }
 
-  const isWin = MOCK_GAME.result === "W";
+  const isWin = gameData?.result === "W";
 
   return (
     <>
@@ -117,7 +265,6 @@ export default function TeamFeedPage() {
 
         .page { min-height: 100vh; background: #fafafa; padding-bottom: 80px; }
 
-        /* Hero */
         .hero {
           background: #fff;
           border-bottom: 1px solid #e4e4e7;
@@ -144,64 +291,42 @@ export default function TeamFeedPage() {
         .team-identity { display: flex; align-items: center; gap: 14px; }
 
         .team-logo-circle {
-          width: 60px;
-          height: 60px;
+          width: 60px; height: 60px;
           border-radius: 50%;
           background: var(--faint);
           border: 2px solid var(--faint);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          overflow: hidden; flex-shrink: 0;
         }
 
         .team-name {
           font-family: 'Oswald', sans-serif;
           font-size: clamp(26px, 5vw, 40px);
-          font-weight: 700;
-          color: #18181b;
-          line-height: 1;
-          letter-spacing: -0.01em;
+          font-weight: 700; color: #18181b;
+          line-height: 1; letter-spacing: -0.01em;
         }
-
         .team-sub {
           font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
-          color: #a1a1aa;
-          margin-top: 4px;
+          font-size: 12px; color: #a1a1aa; margin-top: 4px;
         }
 
-        /* Feed */
         .feed {
-          max-width: 680px;
-          margin: 0 auto;
+          max-width: 680px; margin: 0 auto;
           padding: 24px 24px 0;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
+          display: flex; flex-direction: column; gap: 20px;
         }
 
         .section-label {
           font-family: 'DM Sans', sans-serif;
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: #a1a1aa;
-          margin-bottom: 8px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          font-size: 10px; font-weight: 500;
+          letter-spacing: 0.14em; text-transform: uppercase;
+          color: #a1a1aa; margin-bottom: 8px;
+          display: flex; align-items: center; gap: 8px;
         }
         .section-label::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: #e4e4e7;
+          content: ''; flex: 1; height: 1px; background: #e4e4e7;
         }
 
-        /* Card */
         .card {
           background: #fff;
           border: 1.5px solid #e4e4e7;
@@ -209,35 +334,40 @@ export default function TeamFeedPage() {
           padding: 20px;
         }
 
-        /* Score */
+        /* Score skeleton */
+        .skeleton {
+          background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
         .score-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 
         .status-pill {
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          padding: 3px 10px;
-          border-radius: 100px;
+          font-size: 11px; font-weight: 500;
+          letter-spacing: 0.07em; text-transform: uppercase;
+          padding: 3px 10px; border-radius: 100px;
         }
         .pill-final    { background: #f4f4f5; color: #71717a; }
         .pill-live     { background: #fef2f2; color: #dc2626; }
-        .pill-upcoming { background: #eff6ff; color: #2563eb; }
+        .pill-scheduled { background: #eff6ff; color: #2563eb; }
 
         .result-badge {
           font-family: 'Oswald', sans-serif;
-          font-size: 13px;
-          font-weight: 700;
+          font-size: 13px; font-weight: 700;
           letter-spacing: 0.05em;
-          padding: 3px 12px;
-          border-radius: 100px;
+          padding: 3px 12px; border-radius: 100px;
         }
         .badge-w { background: #f0fdf4; color: #16a34a; }
         .badge-l { background: #fef2f2; color: #dc2626; }
 
         .matchup { display: flex; align-items: flex-end; justify-content: center; gap: 0; }
-
         .score-team { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
 
         .score-logo {
@@ -246,204 +376,116 @@ export default function TeamFeedPage() {
           display: flex; align-items: center; justify-content: center;
           overflow: hidden;
         }
-
         .score-abbr {
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          font-weight: 500;
-          color: #71717a;
+          font-size: 11px; font-weight: 500; color: #71717a;
           letter-spacing: 0.04em;
         }
-
         .score-num {
           font-family: 'Oswald', sans-serif;
-          font-size: 48px;
-          font-weight: 700;
-          line-height: 1;
-          color: #18181b;
+          font-size: 48px; font-weight: 700; line-height: 1; color: #18181b;
         }
         .score-num.muted { color: #d4d4d8; }
-
         .score-sep {
           font-family: 'Oswald', sans-serif;
-          font-size: 32px;
-          font-weight: 300;
-          color: #e4e4e7;
-          padding: 0 12px;
-          padding-bottom: 14px;
+          font-size: 32px; font-weight: 300; color: #e4e4e7;
+          padding: 0 12px; padding-bottom: 14px;
         }
-
         .score-footer {
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          color: #a1a1aa;
-          text-align: center;
-          margin-top: 16px;
-          padding-top: 14px;
-          border-top: 1px solid #f4f4f5;
+          font-size: 11px; color: #a1a1aa;
+          text-align: center; margin-top: 16px;
+          padding-top: 14px; border-top: 1px solid #f4f4f5;
         }
 
-        /* Stat */
         .stat-row { display: flex; align-items: center; gap: 14px; }
-
         .stat-icon-box {
-          width: 46px; height: 46px;
-          border-radius: 12px;
+          width: 46px; height: 46px; border-radius: 12px;
           background: var(--faint);
           display: flex; align-items: center; justify-content: center;
-          font-size: 22px;
-          flex-shrink: 0;
+          font-size: 22px; flex-shrink: 0;
         }
-
         .stat-val {
           font-family: 'Oswald', sans-serif;
-          font-size: 34px;
-          font-weight: 700;
-          color: var(--color);
-          line-height: 1;
+          font-size: 34px; font-weight: 700; color: var(--color); line-height: 1;
         }
         .stat-lbl {
           font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          color: #18181b;
-          margin-top: 3px;
+          font-size: 13px; font-weight: 500; color: #18181b; margin-top: 3px;
         }
         .stat-ctx {
           font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          color: #a1a1aa;
-          margin-top: 2px;
+          font-size: 11px; color: #a1a1aa; margin-top: 2px;
         }
 
-        /* Articles */
         .articles-stack { display: flex; flex-direction: column; gap: 10px; }
-
         .article-card {
-          background: #fff;
-          border: 1.5px solid #e4e4e7;
-          border-radius: 16px;
-          padding: 18px 20px;
+          background: #fff; border: 1.5px solid #e4e4e7;
+          border-radius: 16px; padding: 18px 20px;
           cursor: pointer;
           transition: border-color 0.15s, box-shadow 0.15s;
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
+          display: flex; flex-direction: column; gap: 7px;
         }
         .article-card:hover {
           border-color: var(--color);
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
         }
-
         .article-row1 { display: flex; align-items: center; justify-content: space-between; }
-
         .article-source {
           font-family: 'DM Sans', sans-serif;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--color);
+          font-size: 10px; font-weight: 600;
+          letter-spacing: 0.1em; text-transform: uppercase; color: var(--color);
         }
-
-        .article-time {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          color: #a1a1aa;
-        }
-
+        .article-time { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
         .article-title {
           font-family: 'Oswald', sans-serif;
-          font-size: 16px;
-          font-weight: 600;
-          color: #18181b;
-          line-height: 1.25;
-          letter-spacing: 0.01em;
+          font-size: 16px; font-weight: 600; color: #18181b;
+          line-height: 1.25; letter-spacing: 0.01em;
         }
-
         .article-summary {
           font-family: 'DM Sans', sans-serif;
-          font-size: 13px;
-          color: #71717a;
-          line-height: 1.55;
-          font-weight: 300;
+          font-size: 13px; color: #71717a; line-height: 1.55; font-weight: 300;
         }
-
         .article-cta {
           font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--color);
-          margin-top: 2px;
+          font-size: 12px; font-weight: 500; color: var(--color); margin-top: 2px;
         }
 
-        /* Fact */
         .fact-card {
-          background: var(--faint);
-          border: 1.5px solid #e4e4e7;
+          background: var(--faint); border: 1.5px solid #e4e4e7;
           border-left: 4px solid var(--color);
-          border-radius: 0 16px 16px 0;
-          padding: 18px 20px;
+          border-radius: 0 16px 16px 0; padding: 18px 20px;
         }
         .fact-eyebrow {
           font-family: 'DM Sans', sans-serif;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--color);
-          margin-bottom: 8px;
+          font-size: 10px; font-weight: 600;
+          letter-spacing: 0.12em; text-transform: uppercase;
+          color: var(--color); margin-bottom: 8px;
         }
         .fact-text {
           font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          color: #3f3f46;
-          line-height: 1.65;
+          font-size: 14px; color: #3f3f46; line-height: 1.65;
         }
 
-        /* Reddit */
         .reddit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .reddit-author {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
-          font-weight: 500;
-          color: #FF4500;
-        }
-        .reddit-meta-right {
-          display: flex; align-items: center; gap: 10px;
-        }
-        .reddit-sub, .reddit-upvotes {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          color: #a1a1aa;
-        }
+        .reddit-author { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: #FF4500; }
+        .reddit-meta-right { display: flex; align-items: center; gap: 10px; }
+        .reddit-sub, .reddit-upvotes { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
         .reddit-text {
           font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          color: #18181b;
-          line-height: 1.65;
-          font-style: italic;
+          font-size: 14px; color: #18181b; line-height: 1.65; font-style: italic;
         }
         .reddit-text::before { content: '"'; }
         .reddit-text::after  { content: '"'; }
         .reddit-footer {
           display: flex; align-items: center; justify-content: space-between;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid #f4f4f5;
+          margin-top: 12px; padding-top: 12px; border-top: 1px solid #f4f4f5;
         }
-        .reddit-ago {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px;
-          color: #a1a1aa;
-        }
+        .reddit-ago { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
         .reddit-link {
           font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
-          font-weight: 500;
-          color: #FF4500;
-          text-decoration: none;
-          cursor: pointer;
+          font-size: 12px; font-weight: 500; color: #FF4500;
+          text-decoration: none; cursor: pointer;
         }
 
         @media (max-width: 480px) {
@@ -455,12 +497,9 @@ export default function TeamFeedPage() {
 
       <div
         className="page"
-        style={{
-          "--color": team.color,
-          "--faint": `${team.color}12`,
-        } as React.CSSProperties}
+        style={{ "--color": team.color, "--faint": `${team.color}12` } as React.CSSProperties}
       >
-        {/* Hero */}
+        {/* ── Hero ── */}
         <div className="hero">
           <div className="hero-inner">
             <button className="back-btn" onClick={() => router.push("/mlb")}>
@@ -471,8 +510,7 @@ export default function TeamFeedPage() {
                 <Image
                   src={`/logos/mlb/${team.abbreviation.toLowerCase()}.png`}
                   alt={team.name}
-                  width={46}
-                  height={46}
+                  width={46} height={46}
                   style={{ objectFit: "contain" }}
                 />
               </div>
@@ -484,69 +522,104 @@ export default function TeamFeedPage() {
           </div>
         </div>
 
-        {/* Feed */}
+        {/* ── Feed ── */}
         <div className="feed">
 
           {/* ── Score ── */}
           <div>
-            <p className="section-label">Most Recent Game</p>
-            <div className="card">
-              <div className="score-top">
-                <span className={`status-pill ${
-                  MOCK_GAME.status === "Live" ? "pill-live" :
-                  MOCK_GAME.status === "Final" ? "pill-final" : "pill-upcoming"
-                }`}>
-                  {MOCK_GAME.status === "Live"
-                    ? `🔴 Live · ${MOCK_GAME.inning}`
-                    : MOCK_GAME.status}
-                </span>
-                {MOCK_GAME.result && (
-                  <span className={`result-badge ${isWin ? "badge-w" : "badge-l"}`}>
-                    {isWin ? "✓ Win" : "✗ Loss"}
-                  </span>
-                )}
-              </div>
+            <p className="section-label">
+              {gameData?.isToday ? "Today's Game" : "Most Recent Game"}
+            </p>
 
-              <div className="matchup">
-                {/* Away */}
-                <div className="score-team">
-                  <div className="score-logo">
-                    <Image
-                      src={`/logos/mlb/${MOCK_GAME.awayTeam.abbreviation.toLowerCase()}.png`}
-                      alt={MOCK_GAME.awayTeam.abbreviation}
-                      width={30} height={30}
-                      style={{ objectFit: "contain" }}
-                    />
+            {gameLoading ? (
+              /* Skeleton */
+              <div className="card">
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div className="skeleton" style={{ width: 60, height: 22 }} />
+                  <div className="skeleton" style={{ width: 50, height: 22 }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1 }}>
+                    <div className="skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
+                    <div className="skeleton" style={{ width: 36, height: 12 }} />
+                    <div className="skeleton" style={{ width: 48, height: 52 }} />
                   </div>
-                  <span className="score-abbr">{MOCK_GAME.awayTeam.abbreviation}</span>
-                  <span className={`score-num ${isWin ? "muted" : ""}`}>
-                    {MOCK_GAME.awayTeam.score}
+                  <div className="skeleton" style={{ width: 20, height: 32, marginBottom: 14 }} />
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1 }}>
+                    <div className="skeleton" style={{ width: 42, height: 42, borderRadius: "50%" }} />
+                    <div className="skeleton" style={{ width: 36, height: 12 }} />
+                    <div className="skeleton" style={{ width: 48, height: 52 }} />
+                  </div>
+                </div>
+                <div className="skeleton" style={{ width: "60%", height: 12, margin: "18px auto 0" }} />
+              </div>
+            ) : !gameData ? (
+              <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+                  No recent game data available.
+                </p>
+              </div>
+            ) : (
+              <div className="card">
+                <div className="score-top">
+                  <span className={`status-pill ${
+                    gameData.status === "Live" ? "pill-live" :
+                    gameData.status === "Final" ? "pill-final" : "pill-scheduled"
+                  }`}>
+                    {gameData.status === "Live"
+                      ? `🔴 Live · ${gameData.inning}`
+                      : gameData.status === "Scheduled"
+                      ? "Scheduled"
+                      : "Final"}
                   </span>
+                  {gameData.result && (
+                    <span className={`result-badge ${isWin ? "badge-w" : "badge-l"}`}>
+                      {isWin ? "✓ Win" : "✗ Loss"}
+                    </span>
+                  )}
                 </div>
 
-                <span className="score-sep">–</span>
-
-                {/* Home */}
-                <div className="score-team">
-                  <div className="score-logo">
-                    <Image
-                      src={`/logos/mlb/${MOCK_GAME.homeTeam.abbreviation.toLowerCase()}.png`}
-                      alt={MOCK_GAME.homeTeam.abbreviation}
-                      width={30} height={30}
-                      style={{ objectFit: "contain" }}
-                    />
+                <div className="matchup">
+                  {/* Away */}
+                  <div className="score-team">
+                    <div className="score-logo">
+                      <Image
+                        src={`/logos/mlb/${gameData.awayTeam.abbreviation.toLowerCase()}.png`}
+                        alt={gameData.awayTeam.abbreviation}
+                        width={30} height={30}
+                        style={{ objectFit: "contain" }}
+                      />
+                    </div>
+                    <span className="score-abbr">{gameData.awayTeam.abbreviation}</span>
+                    <span className={`score-num ${gameData.status !== "Scheduled" && gameData.result !== null && !isWin && gameData.awayTeam.abbreviation !== team.abbreviation ? "" : gameData.status !== "Scheduled" && gameData.awayTeam.score !== null && gameData.homeTeam.score !== null && gameData.awayTeam.score < gameData.homeTeam.score ? "muted" : ""}`}>
+                      {gameData.status === "Scheduled" ? "–" : (gameData.awayTeam.score ?? "–")}
+                    </span>
                   </div>
-                  <span className="score-abbr">{MOCK_GAME.homeTeam.abbreviation}</span>
-                  <span className={`score-num ${!isWin ? "muted" : ""}`}>
-                    {MOCK_GAME.homeTeam.score}
-                  </span>
+
+                  <span className="score-sep">–</span>
+
+                  {/* Home */}
+                  <div className="score-team">
+                    <div className="score-logo">
+                      <Image
+                        src={`/logos/mlb/${gameData.homeTeam.abbreviation.toLowerCase()}.png`}
+                        alt={gameData.homeTeam.abbreviation}
+                        width={30} height={30}
+                        style={{ objectFit: "contain" }}
+                      />
+                    </div>
+                    <span className="score-abbr">{gameData.homeTeam.abbreviation}</span>
+                    <span className={`score-num ${gameData.status !== "Scheduled" && gameData.homeTeam.score !== null && gameData.awayTeam.score !== null && gameData.homeTeam.score < gameData.awayTeam.score ? "muted" : ""}`}>
+                      {gameData.status === "Scheduled" ? "–" : (gameData.homeTeam.score ?? "–")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="score-footer">
+                  {gameData.date} · {gameData.venue}
                 </div>
               </div>
-
-              <div className="score-footer">
-                {MOCK_GAME.date} · {MOCK_GAME.venue}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ── Stat ── */}
