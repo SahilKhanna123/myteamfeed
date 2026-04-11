@@ -5,43 +5,38 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 const MLB_TEAMS = [
-  // AL EAST
   { espnId: "2",  name: "Red Sox",      abbreviation: "BOS", city: "Boston",        color: "#BD3039", league: "AL", division: "AL East" },
-  { espnId: "10", name: "Yankees",       abbreviation: "NYY", city: "New York",      color: "#003087", league: "AL", division: "AL East" },
-  { espnId: "1",  name: "Blue Jays",     abbreviation: "TOR", city: "Toronto",       color: "#134A8E", league: "AL", division: "AL East" },
-  { espnId: "21", name: "Orioles",       abbreviation: "BAL", city: "Baltimore",     color: "#DF4601", league: "AL", division: "AL East" },
-  { espnId: "30", name: "Rays",          abbreviation: "TB",  city: "Tampa Bay",     color: "#092C5C", league: "AL", division: "AL East" },
-  // AL CENTRAL
-  { espnId: "5",  name: "Guardians",     abbreviation: "CLE", city: "Cleveland",     color: "#00385D", league: "AL", division: "AL Central" },
-  { espnId: "7",  name: "Royals",        abbreviation: "KC",  city: "Kansas City",   color: "#004687", league: "AL", division: "AL Central" },
-  { espnId: "9",  name: "Twins",         abbreviation: "MIN", city: "Minnesota",     color: "#002B5C", league: "AL", division: "AL Central" },
-  { espnId: "24", name: "Tigers",        abbreviation: "DET", city: "Detroit",       color: "#0C2340", league: "AL", division: "AL Central" },
-  { espnId: "13", name: "White Sox",     abbreviation: "CHW", city: "Chicago",       color: "#27251F", league: "AL", division: "AL Central" },
-  // AL WEST
-  { espnId: "18", name: "Rangers",       abbreviation: "TEX", city: "Texas",         color: "#003278", league: "AL", division: "AL West" },
-  { espnId: "6",  name: "Astros",        abbreviation: "HOU", city: "Houston",       color: "#002D62", league: "AL", division: "AL West" },
-  { espnId: "27", name: "Mariners",      abbreviation: "SEA", city: "Seattle",       color: "#0C2C56", league: "AL", division: "AL West" },
-  { espnId: "3",  name: "Angels",        abbreviation: "LAA", city: "Los Angeles",   color: "#BA0021", league: "AL", division: "AL West" },
-  { espnId: "11", name: "Athletics",     abbreviation: "ATH", city: "Oakland",       color: "#003831", league: "AL", division: "AL West" },
-  // NL EAST
-  { espnId: "12", name: "Braves",        abbreviation: "ATL", city: "Atlanta",       color: "#13274F", league: "NL", division: "NL East" },
-  { espnId: "16", name: "Phillies",      abbreviation: "PHI", city: "Philadelphia",  color: "#E81828", league: "NL", division: "NL East" },
-  { espnId: "15", name: "Mets",          abbreviation: "NYM", city: "New York",      color: "#002D72", league: "NL", division: "NL East" },
-  { espnId: "20", name: "Nationals",     abbreviation: "WSH", city: "Washington",    color: "#AB0003", league: "NL", division: "NL East" },
-  { espnId: "28", name: "Marlins",       abbreviation: "MIA", city: "Miami",         color: "#00A3E0", league: "NL", division: "NL East" },
-  // NL CENTRAL
-  { espnId: "8",  name: "Brewers",       abbreviation: "MIL", city: "Milwaukee",     color: "#12284B", league: "NL", division: "NL Central" },
-  { espnId: "4",  name: "Cubs",          abbreviation: "CHC", city: "Chicago",       color: "#0E3386", league: "NL", division: "NL Central" },
-  { espnId: "25", name: "Cardinals",     abbreviation: "STL", city: "St. Louis",     color: "#C41E3A", league: "NL", division: "NL Central" },
-  { espnId: "17", name: "Reds",          abbreviation: "CIN", city: "Cincinnati",    color: "#C6011F", league: "NL", division: "NL Central" },
-  { espnId: "23", name: "Pirates",       abbreviation: "PIT", city: "Pittsburgh",    color: "#27251F", league: "NL", division: "NL Central" },
-  // NL WEST
-  { espnId: "19", name: "Dodgers",       abbreviation: "LAD", city: "Los Angeles",   color: "#005A9C", league: "NL", division: "NL West" },
-  { espnId: "29", name: "Diamondbacks",  abbreviation: "ARI", city: "Arizona",       color: "#A71930", league: "NL", division: "NL West" },
-  { espnId: "26", name: "Giants",        abbreviation: "SF",  city: "San Francisco", color: "#FD5A1E", league: "NL", division: "NL West" },
-  { espnId: "33", name: "Rockies",       abbreviation: "COL", city: "Colorado",      color: "#333366", league: "NL", division: "NL West" },
-  { espnId: "22", name: "Padres",        abbreviation: "SD",  city: "San Diego",     color: "#2F241D", league: "NL", division: "NL West" },
+  { espnId: "10", name: "Yankees",      abbreviation: "NYY", city: "New York",      color: "#003087", league: "AL", division: "AL East" },
+  { espnId: "14",  name: "Blue Jays",    abbreviation: "TOR", city: "Toronto",       color: "#134A8E", league: "AL", division: "AL East" },
+  { espnId: "1", name: "Orioles",      abbreviation: "BAL", city: "Baltimore",     color: "#DF4601", league: "AL", division: "AL East" },
+  { espnId: "30", name: "Rays",         abbreviation: "TB",  city: "Tampa Bay",     color: "#092C5C", league: "AL", division: "AL East" },
+  { espnId: "5",  name: "Guardians",    abbreviation: "CLE", city: "Cleveland",     color: "#00385D", league: "AL", division: "AL Central" },
+  { espnId: "7",  name: "Royals",       abbreviation: "KC",  city: "Kansas City",   color: "#004687", league: "AL", division: "AL Central" },
+  { espnId: "9",  name: "Twins",        abbreviation: "MIN", city: "Minnesota",     color: "#002B5C", league: "AL", division: "AL Central" },
+  { espnId: "6", name: "Tigers",       abbreviation: "DET", city: "Detroit",       color: "#0C2340", league: "AL", division: "AL Central" },
+  { espnId: "4", name: "White Sox",    abbreviation: "CHW", city: "Chicago",       color: "#27251F", league: "AL", division: "AL Central" },
+  { espnId: "13", name: "Rangers",      abbreviation: "TEX", city: "Texas",         color: "#003278", league: "AL", division: "AL West" },
+  { espnId: "18",  name: "Astros",       abbreviation: "HOU", city: "Houston",       color: "#002D62", league: "AL", division: "AL West" },
+  { espnId: "12", name: "Mariners",     abbreviation: "SEA", city: "Seattle",       color: "#0C2C56", league: "AL", division: "AL West" },
+  { espnId: "3",  name: "Angels",       abbreviation: "LAA", city: "Los Angeles",   color: "#BA0021", league: "AL", division: "AL West" },
+  { espnId: "11", name: "Athletics",    abbreviation: "ATH", city: "Oakland",       color: "#003831", league: "AL", division: "AL West" },
+  { espnId: "15", name: "Braves",       abbreviation: "ATL", city: "Atlanta",       color: "#13274F", league: "NL", division: "NL East" },
+  { espnId: "22", name: "Phillies",     abbreviation: "PHI", city: "Philadelphia",  color: "#E81828", league: "NL", division: "NL East" },
+  { espnId: "21", name: "Mets",         abbreviation: "NYM", city: "New York",      color: "#002D72", league: "NL", division: "NL East" },
+  { espnId: "20", name: "Nationals",    abbreviation: "WSH", city: "Washington",    color: "#AB0003", league: "NL", division: "NL East" },
+  { espnId: "28", name: "Marlins",      abbreviation: "MIA", city: "Miami",         color: "#00A3E0", league: "NL", division: "NL East" },
+  { espnId: "8",  name: "Brewers",      abbreviation: "MIL", city: "Milwaukee",     color: "#12284B", league: "NL", division: "NL Central" },
+  { espnId: "16",  name: "Cubs",         abbreviation: "CHC", city: "Chicago",       color: "#0E3386", league: "NL", division: "NL Central" },
+  { espnId: "24", name: "Cardinals",    abbreviation: "STL", city: "St. Louis",     color: "#C41E3A", league: "NL", division: "NL Central" },
+  { espnId: "17", name: "Reds",         abbreviation: "CIN", city: "Cincinnati",    color: "#C6011F", league: "NL", division: "NL Central" },
+  { espnId: "23", name: "Pirates",      abbreviation: "PIT", city: "Pittsburgh",    color: "#27251F", league: "NL", division: "NL Central" },
+  { espnId: "19", name: "Dodgers",      abbreviation: "LAD", city: "Los Angeles",   color: "#005A9C", league: "NL", division: "NL West" },
+  { espnId: "29", name: "Diamondbacks", abbreviation: "ARI", city: "Arizona",       color: "#A71930", league: "NL", division: "NL West" },
+  { espnId: "26", name: "Giants",       abbreviation: "SF",  city: "San Francisco", color: "#FD5A1E", league: "NL", division: "NL West" },
+  { espnId: "27", name: "Rockies",      abbreviation: "COL", city: "Colorado",      color: "#333366", league: "NL", division: "NL West" },
+  { espnId: "25", name: "Padres",       abbreviation: "SD",  city: "San Diego",     color: "#2F241D", league: "NL", division: "NL West" },
 ] as const;
+
 
 type Division = "AL East" | "AL Central" | "AL West" | "NL East" | "NL Central" | "NL West";
 const DIVISIONS: Division[] = ["AL East", "AL Central", "AL West", "NL East", "NL Central", "NL West"];
