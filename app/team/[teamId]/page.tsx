@@ -1003,16 +1003,9 @@ export default function TeamFeedPage() {
               </div>
             )}
           </div>
-          {/* ── END CHANGED ── */}
+
  
-          {/* ── Fact (UNCHANGED) ── */}
-          <div>
-            <p className="section-label">Did You Know</p>
-            <div className="fact-card">
-              <div className="fact-eyebrow">⚡ Interesting Fact</div>
-              <p className="fact-text">{MOCK_FACT.text}</p>
-            </div>
-          </div>
+         
           {/* ── Fact ── */}
           <div>
             <p className="section-label">Did You Know</p>
