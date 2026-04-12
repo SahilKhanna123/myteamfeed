@@ -59,24 +59,7 @@ const MOCK_STAT = {
   context: "3rd best in the AL",
 };
 
-const MOCK_ARTICLES = [
-  {
-    id: "1",
-    source: "ESPN",
-    title: "Red Sox bullpen shines in series-clinching win over Yankees",
-    summary: "Boston's relievers threw 4.2 scoreless innings to preserve the lead and take the series 2–1.",
-    url: "https://espn.com",
-    time: "2h ago",
-  },
-  {
-    id: "2",
-    source: "Bleacher Report",
-    title: "Rafael Devers is quietly having an MVP-caliber April",
-    summary: "Through the first two weeks, Devers leads all AL third basemen in OPS and is making a strong early-season case.",
-    url: "https://bleacherreport.com",
-    time: "5h ago",
-  },
-];
+
 
 const MOCK_FACT = {
   text: "Fenway Park's Green Monster is 37 feet 2 inches tall — originally built that height to block the view of non-paying fans watching from a hill outside the park.",
@@ -234,6 +217,38 @@ function useGameData(teamId: string) {
 
   return { gameData, loading };
 }
+interface Article {
+  id: string;
+  source: string;
+  title: string;
+  summary: string;
+  url: string;
+  time: string;
+}
+ 
+function useNewsData(teamName: string, teamCity: string) {
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+ 
+  useEffect(() => {
+    async function load() {
+      try {
+        const query = encodeURIComponent(`${teamCity} ${teamName}`);
+        const res = await fetch(`/api/news?team=${query}`);
+        const json = await res.json();
+        setArticles(json.articles ?? []);
+      } catch (e) {
+        console.error("News fetch failed", e);
+        setArticles([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [teamName, teamCity]);
+ 
+  return { articles, loading };
+}
 // ─── Live Game Panel ──────────────────────────────────────────────────────────
 interface LiveData {
   currentPitcher: { name: string; summary: string };
@@ -246,36 +261,6 @@ interface LiveData {
   gamePk:         string | null;
 }
 
-function useESPNGamePk(teamId: string, isLive: boolean) {
-  const [gamePk, setGamePk] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLive) return;
-    async function fetchPk() {
-      try {
-        const res = await fetch(
-          "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
-        );
-        const json = await res.json();
-        const events: any[] = json.events ?? [];
-        const todayGame = events.find((ev) =>
-          ev.competitions?.[0]?.competitors?.some(
-            (c: any) => c.id === teamId || c.team?.id === teamId
-          )
-        );
-        if (todayGame) {
-          // ESPN event IDs map 1:1 to MLB Stats API gamePks
-          setGamePk(todayGame.id);
-        }
-      } catch (e) {
-        console.error("Failed to fetch gamePk", e);
-      }
-    }
-    fetchPk();
-  }, [teamId, isLive]);
-
-  return gamePk;
-}
 
 function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData | null; loading: boolean } {
   const [liveData, setLiveData] = useState<LiveData | null>(null);
@@ -585,6 +570,7 @@ export default function TeamFeedPage() {
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
+  const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
 
   if (!team) {
     return (
@@ -986,25 +972,47 @@ export default function TeamFeedPage() {
           {/* ── Articles ── */}
           <div>
             <p className="section-label">Latest News</p>
-            <div className="articles-stack">
-              {MOCK_ARTICLES.map((a) => (
-                <div
-                  key={a.id}
-                  className="article-card"
-                  onClick={() => window.open(a.url, "_blank")}
-                >
-                  <div className="article-row1">
-                    <span className="article-source">{a.source}</span>
-                    <span className="article-time">{a.time}</span>
+            {newsLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="skeleton" style={{ height: 100, borderRadius: 16 }} />
+                <div className="skeleton" style={{ height: 100, borderRadius: 16 }} />
+              </div>
+            ) : articles.length === 0 ? (
+              <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+                  No recent articles found.
+                </p>
+              </div>
+            ) : (
+              <div className="articles-stack">
+                {articles.map((a) => (
+                  <div
+                    key={a.id}
+                    className="article-card"
+                    onClick={() => window.open(a.url, "_blank")}
+                  >
+                    <div className="article-row1">
+                      <span className="article-source">{a.source}</span>
+                      <span className="article-time">{a.time}</span>
+                    </div>
+                    <h2 className="article-title">{a.title}</h2>
+                    <p className="article-summary">{a.summary}</p>
+                    <span className="article-cta">Read article →</span>
                   </div>
-                  <h2 className="article-title">{a.title}</h2>
-                  <p className="article-summary">{a.summary}</p>
-                  <span className="article-cta">Read article →</span>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+          {/* ── END CHANGED ── */}
+ 
+          {/* ── Fact (UNCHANGED) ── */}
+          <div>
+            <p className="section-label">Did You Know</p>
+            <div className="fact-card">
+              <div className="fact-eyebrow">⚡ Interesting Fact</div>
+              <p className="fact-text">{MOCK_FACT.text}</p>
             </div>
           </div>
-
           {/* ── Fact ── */}
           <div>
             <p className="section-label">Did You Know</p>
