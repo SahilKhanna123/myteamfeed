@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 
+
 // ─── Team data ───────────────────────────────────────────────────────────────
 const MLB_TEAMS = [
   { espnId: "2",  name: "Red Sox",      abbreviation: "BOS", city: "Boston",        color: "#BD3039", league: "AL", division: "AL East" },
@@ -605,6 +606,45 @@ function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) 
 
     </div>
   );
+}// ─── Reddit ───────────────────────────────────────────────────────────────────
+const TEAM_SUBREDDITS: Record<string, string> = {
+  "2":  "redsox",       "10": "NYYankees",        "14": "Torontobluejays",
+  "1":  "orioles",      "30": "TampaBayRays",      "5":  "ClevelandGuardians",
+  "7":  "KCRoyals",     "9":  "minnesotatwins",    "6":  "motorcitykitties",
+  "4":  "whitesox",     "13": "TexasRangers",      "18": "Astros",
+  "12": "Mariners",     "3":  "angelsbaseball",    "11": "OaklandAthletics",
+  "15": "Braves",       "22": "phillies",          "21": "NewYorkMets",
+  "20": "Nationals",    "28": "letsgofish",        "8":  "BrewersZone",
+  "16": "CHICubs",      "24": "Cardinals",         "17": "Reds",
+  "23": "buccos",       "19": "Dodgers",           "29": "azdiamondbacks",
+  "26": "SFGiants",     "27": "ColoradoRockies",   "25": "Padres",
+};
+
+interface RedditPost {
+  author: string;
+  subreddit: string;
+  upvotes: string;
+  text: string;
+  url: string;
+  time: string;
+}
+
+function useRedditPost(teamId: string) {
+  const [post, setPost] = useState<RedditPost | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const subreddit = TEAM_SUBREDDITS[teamId];
+    if (!subreddit) { setLoading(false); return; }
+
+    fetch(`/api/reddit?subreddit=${subreddit}`)
+      .then((r) => r.json())
+      .then((data) => setPost(data.post ?? null))
+      .catch(() => setPost(null))
+      .finally(() => setLoading(false));
+  }, [teamId]);
+
+  return { post, loading };
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -615,6 +655,7 @@ export default function TeamFeedPage() {
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
+   const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
 
   if (!team) {
     return (
@@ -1059,27 +1100,38 @@ export default function TeamFeedPage() {
             </div>
           </div>
 
-          {/* ── Reddit ── */}
           <div>
-            <p className="section-label">Fan Hot Take</p>
-            <div className="card">
-              <div className="reddit-top">
-                <span className="reddit-author">{MOCK_REDDIT.author}</span>
-                <div className="reddit-meta-right">
-                  <span className="reddit-sub">{MOCK_REDDIT.subreddit}</span>
-                  <span className="reddit-upvotes">▲ {MOCK_REDDIT.upvotes}</span>
-                </div>
-              </div>
-              <p className="reddit-text">{MOCK_REDDIT.text}</p>
-              <div className="reddit-footer">
-                <span className="reddit-ago">{MOCK_REDDIT.time}</span>
-                <a className="reddit-link" href={MOCK_REDDIT.url} target="_blank" rel="noreferrer">
-                  View thread →
-                </a>
-              </div>
-            </div>
-          </div>
-
+  <p className="section-label">Fan Hot Take</p>
+  {redditLoading ? (
+    <div className="card">
+      <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
+      <div className="skeleton" style={{ width: "100%", height: 60 }} />
+    </div>
+  ) : !redditPost ? (
+    <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+        No posts found.
+      </p>
+    </div>
+  ) : (
+    <div className="card">
+      <div className="reddit-top">
+        <span className="reddit-author">{redditPost.author}</span>
+        <div className="reddit-meta-right">
+          <span className="reddit-sub">{redditPost.subreddit}</span>
+          <span className="reddit-upvotes">▲ {redditPost.upvotes}</span>
+        </div>
+      </div>
+      <p className="reddit-text">{redditPost.text}</p>
+      <div className="reddit-footer">
+        <span className="reddit-ago">{redditPost.time}</span>
+        <a className="reddit-link" href={redditPost.url} target="_blank" rel="noreferrer">
+          View thread →
+        </a>
+      </div>
+    </div>
+  )}
+</div>
         </div>
       </div>
     </>
