@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 
+
 // ─── Team data ───────────────────────────────────────────────────────────────
 const MLB_TEAMS = [
   { espnId: "2",  name: "Red Sox",      abbreviation: "BOS", city: "Boston",        color: "#BD3039", league: "AL", division: "AL East" },
@@ -59,24 +60,7 @@ const MOCK_STAT = {
   context: "3rd best in the AL",
 };
 
-const MOCK_ARTICLES = [
-  {
-    id: "1",
-    source: "ESPN",
-    title: "Red Sox bullpen shines in series-clinching win over Yankees",
-    summary: "Boston's relievers threw 4.2 scoreless innings to preserve the lead and take the series 2–1.",
-    url: "https://espn.com",
-    time: "2h ago",
-  },
-  {
-    id: "2",
-    source: "Bleacher Report",
-    title: "Rafael Devers is quietly having an MVP-caliber April",
-    summary: "Through the first two weeks, Devers leads all AL third basemen in OPS and is making a strong early-season case.",
-    url: "https://bleacherreport.com",
-    time: "5h ago",
-  },
-];
+
 
 const MOCK_FACT = {
   text: "Fenway Park's Green Monster is 37 feet 2 inches tall — originally built that height to block the view of non-paying fans watching from a hill outside the park.",
@@ -176,7 +160,7 @@ function useGameData(teamId: string) {
     async function load() {
       setLoading(true);
       try {
-        // Step 1 — check today's scoreboard for this team
+        // Step 1 — check today's scoreboard
         const scoreboardRes = await fetch(
           "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
         );
@@ -195,29 +179,73 @@ function useGameData(teamId: string) {
           return;
         }
 
-        // Step 2 — no game today; pull team schedule for most recent completed game
-        const teamRes = await fetch(
+        // Step 2 — no game today, fetch team schedule and find last completed game
+        const scheduleRes = await fetch(
           `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}/schedule`
         );
-        const teamJson = await teamRes.json();
-        const events: any[] = teamJson.events ?? [];
+        const scheduleJson = await scheduleRes.json();
+        const events: any[] = scheduleJson.events ?? [];
 
-        // Find the last completed game
         const completed = events
-          .filter(
-            (ev) =>
-              ev.competitions?.[0]?.status?.type?.state === "post"
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.date ?? b.competitions[0].date).getTime() -
-              new Date(a.date ?? a.competitions[0].date).getTime()
+          .filter((ev) => ev.competitions?.[0]?.status?.type?.state === "post")
+          .sort((a, b) =>
+            new Date(b.competitions[0].date).getTime() -
+            new Date(a.competitions[0].date).getTime()
           );
 
         if (completed.length > 0) {
-          setGameData(
-            parseCompetition(completed[0].competitions[0], teamId, false)
-          );
+          const comp = completed[0].competitions[0];
+
+          // ── The schedule endpoint puts scores differently ──
+          // competitors[].score is a string like "5", but sometimes missing
+          // so we parse it safely here instead of in parseCompetition
+          const home = comp.competitors.find((c: any) => c.homeAway === "home");
+          const away = comp.competitors.find((c: any) => c.homeAway === "away");
+
+          const homeScore = home?.score !== undefined && home?.score !== ""
+            ? parseInt(home.score, 10)
+            : null;
+          const awayScore = away?.score !== undefined && away?.score !== ""
+            ? parseInt(away.score, 10)
+            : null;
+
+          // If scores are still NaN, try linescores sum as fallback
+          const homeScoreFinal = (!isNaN(homeScore as number) && homeScore !== null)
+            ? homeScore
+            : (home?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
+          const awayScoreFinal = (!isNaN(awayScore as number) && awayScore !== null)
+            ? awayScore
+            : (away?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
+
+          const statusState = comp.status?.type?.state ?? "post";
+          const rawDate = comp.date ?? "";
+          const dateStr = rawDate
+            ? new Date(rawDate).toLocaleDateString("en-US", {
+                month: "short", day: "numeric", year: "numeric",
+              })
+            : "TBD";
+
+          const pageTeamIsHome = home?.id === teamId || home?.team?.id === teamId;
+          const pageTeamScore = pageTeamIsHome ? homeScoreFinal : awayScoreFinal;
+          const opponentScore = pageTeamIsHome ? awayScoreFinal : homeScoreFinal;
+          const result: "W" | "L" = pageTeamScore > opponentScore ? "W" : "L";
+
+          setGameData({
+            status: "Final",
+            inning: null,
+            homeTeam: {
+              abbreviation: home?.team?.abbreviation ?? "???",
+              score: homeScoreFinal,
+            },
+            awayTeam: {
+              abbreviation: away?.team?.abbreviation ?? "???",
+              score: awayScoreFinal,
+            },
+            date: dateStr,
+            venue: comp.venue?.fullName ?? "TBD",
+            result,
+            isToday: false,
+          });
         } else {
           setGameData(null);
         }
@@ -234,6 +262,38 @@ function useGameData(teamId: string) {
 
   return { gameData, loading };
 }
+interface Article {
+  id: string;
+  source: string;
+  title: string;
+  summary: string;
+  url: string;
+  time: string;
+}
+ 
+function useNewsData(teamName: string, teamCity: string) {
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+ 
+  useEffect(() => {
+    async function load() {
+      try {
+        const query = encodeURIComponent(`${teamCity} ${teamName}`);
+        const res = await fetch(`/api/news?team=${query}`);
+        const json = await res.json();
+        setArticles(json.articles ?? []);
+      } catch (e) {
+        console.error("News fetch failed", e);
+        setArticles([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [teamName, teamCity]);
+ 
+  return { articles, loading };
+}
 // ─── Live Game Panel ──────────────────────────────────────────────────────────
 interface LiveData {
   currentPitcher: { name: string; summary: string };
@@ -246,36 +306,6 @@ interface LiveData {
   gamePk:         string | null;
 }
 
-function useESPNGamePk(teamId: string, isLive: boolean) {
-  const [gamePk, setGamePk] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLive) return;
-    async function fetchPk() {
-      try {
-        const res = await fetch(
-          "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
-        );
-        const json = await res.json();
-        const events: any[] = json.events ?? [];
-        const todayGame = events.find((ev) =>
-          ev.competitions?.[0]?.competitors?.some(
-            (c: any) => c.id === teamId || c.team?.id === teamId
-          )
-        );
-        if (todayGame) {
-          // ESPN event IDs map 1:1 to MLB Stats API gamePks
-          setGamePk(todayGame.id);
-        }
-      } catch (e) {
-        console.error("Failed to fetch gamePk", e);
-      }
-    }
-    fetchPk();
-  }, [teamId, isLive]);
-
-  return gamePk;
-}
 
 function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData | null; loading: boolean } {
   const [liveData, setLiveData] = useState<LiveData | null>(null);
@@ -576,6 +606,45 @@ function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) 
 
     </div>
   );
+}// ─── Reddit ───────────────────────────────────────────────────────────────────
+const TEAM_SUBREDDITS: Record<string, string> = {
+  "2":  "redsox",       "10": "NYYankees",        "14": "Torontobluejays",
+  "1":  "orioles",      "30": "TampaBayRays",      "5":  "ClevelandGuardians",
+  "7":  "KCRoyals",     "9":  "minnesotatwins",    "6":  "motorcitykitties",
+  "4":  "whitesox",     "13": "TexasRangers",      "18": "Astros",
+  "12": "Mariners",     "3":  "angelsbaseball",    "11": "OaklandAthletics",
+  "15": "Braves",       "22": "phillies",          "21": "NewYorkMets",
+  "20": "Nationals",    "28": "letsgofish",        "8":  "BrewersZone",
+  "16": "CHICubs",      "24": "Cardinals",         "17": "Reds",
+  "23": "buccos",       "19": "Dodgers",           "29": "azdiamondbacks",
+  "26": "SFGiants",     "27": "ColoradoRockies",   "25": "Padres",
+};
+
+interface RedditPost {
+  author: string;
+  subreddit: string;
+  upvotes: string;
+  text: string;
+  url: string;
+  time: string;
+}
+
+function useRedditPost(teamId: string) {
+  const [post, setPost] = useState<RedditPost | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const subreddit = TEAM_SUBREDDITS[teamId];
+    if (!subreddit) { setLoading(false); return; }
+
+    fetch(`/api/reddit?subreddit=${subreddit}`)
+      .then((r) => r.json())
+      .then((data) => setPost(data.post ?? null))
+      .catch(() => setPost(null))
+      .finally(() => setLoading(false));
+  }, [teamId]);
+
+  return { post, loading };
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -585,6 +654,8 @@ export default function TeamFeedPage() {
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
+  const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
+   const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
 
   if (!team) {
     return (
@@ -986,25 +1057,40 @@ export default function TeamFeedPage() {
           {/* ── Articles ── */}
           <div>
             <p className="section-label">Latest News</p>
-            <div className="articles-stack">
-              {MOCK_ARTICLES.map((a) => (
-                <div
-                  key={a.id}
-                  className="article-card"
-                  onClick={() => window.open(a.url, "_blank")}
-                >
-                  <div className="article-row1">
-                    <span className="article-source">{a.source}</span>
-                    <span className="article-time">{a.time}</span>
+            {newsLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="skeleton" style={{ height: 100, borderRadius: 16 }} />
+                <div className="skeleton" style={{ height: 100, borderRadius: 16 }} />
+              </div>
+            ) : articles.length === 0 ? (
+              <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+                  No recent articles found.
+                </p>
+              </div>
+            ) : (
+              <div className="articles-stack">
+                {articles.map((a) => (
+                  <div
+                    key={a.id}
+                    className="article-card"
+                    onClick={() => window.open(a.url, "_blank")}
+                  >
+                    <div className="article-row1">
+                      <span className="article-source">{a.source}</span>
+                      <span className="article-time">{a.time}</span>
+                    </div>
+                    <h2 className="article-title">{a.title}</h2>
+                    <p className="article-summary">{a.summary}</p>
+                    <span className="article-cta">Read article →</span>
                   </div>
-                  <h2 className="article-title">{a.title}</h2>
-                  <p className="article-summary">{a.summary}</p>
-                  <span className="article-cta">Read article →</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
+ 
+         
           {/* ── Fact ── */}
           <div>
             <p className="section-label">Did You Know</p>
@@ -1014,27 +1100,38 @@ export default function TeamFeedPage() {
             </div>
           </div>
 
-          {/* ── Reddit ── */}
           <div>
-            <p className="section-label">Fan Hot Take</p>
-            <div className="card">
-              <div className="reddit-top">
-                <span className="reddit-author">{MOCK_REDDIT.author}</span>
-                <div className="reddit-meta-right">
-                  <span className="reddit-sub">{MOCK_REDDIT.subreddit}</span>
-                  <span className="reddit-upvotes">▲ {MOCK_REDDIT.upvotes}</span>
-                </div>
-              </div>
-              <p className="reddit-text">{MOCK_REDDIT.text}</p>
-              <div className="reddit-footer">
-                <span className="reddit-ago">{MOCK_REDDIT.time}</span>
-                <a className="reddit-link" href={MOCK_REDDIT.url} target="_blank" rel="noreferrer">
-                  View thread →
-                </a>
-              </div>
-            </div>
-          </div>
-
+  <p className="section-label">Fan Hot Take</p>
+  {redditLoading ? (
+    <div className="card">
+      <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
+      <div className="skeleton" style={{ width: "100%", height: 60 }} />
+    </div>
+  ) : !redditPost ? (
+    <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+        No posts found.
+      </p>
+    </div>
+  ) : (
+    <div className="card">
+      <div className="reddit-top">
+        <span className="reddit-author">{redditPost.author}</span>
+        <div className="reddit-meta-right">
+          <span className="reddit-sub">{redditPost.subreddit}</span>
+          <span className="reddit-upvotes">▲ {redditPost.upvotes}</span>
+        </div>
+      </div>
+      <p className="reddit-text">{redditPost.text}</p>
+      <div className="reddit-footer">
+        <span className="reddit-ago">{redditPost.time}</span>
+        <a className="reddit-link" href={redditPost.url} target="_blank" rel="noreferrer">
+          View thread →
+        </a>
+      </div>
+    </div>
+  )}
+</div>
         </div>
       </div>
     </>
