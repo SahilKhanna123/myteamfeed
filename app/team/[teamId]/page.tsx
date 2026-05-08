@@ -628,10 +628,12 @@ interface RedditPost {
   text: string;
   url: string;
   time: string;
-  embedHtml: string | null; 
+  embedHtml: string | null;
 }
+
+// Update hook — returns posts array
 function useRedditPost(teamId: string) {
-  const [post, setPost] = useState<RedditPost | null>(null);
+  const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -640,12 +642,12 @@ function useRedditPost(teamId: string) {
 
     fetch(`/api/reddit?subreddit=${subreddit}`)
       .then((r) => r.json())
-      .then((data) => setPost(data.post ?? null))
-      .catch(() => setPost(null))
+      .then((data) => setPosts(data.posts ?? []))
+      .catch(() => setPosts([]))
       .finally(() => setLoading(false));
   }, [teamId]);
 
-  return { post, loading };
+  return { posts, loading };
 }
 // RedditEmbed component — paste this near your other components
 
@@ -713,7 +715,7 @@ export default function TeamFeedPage() {
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
-   const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
+  const { posts: redditPosts, loading: redditLoading } = useRedditPost(teamId);
 
   if (!team) {
     return (
@@ -1159,20 +1161,28 @@ export default function TeamFeedPage() {
           </div>
 
        <div>
-  <p className="section-label">Fan Hot Take</p>
+  <p className="section-label">Fan Hot Takes</p>
   {redditLoading ? (
-    <div className="card">
-      <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
-      <div className="skeleton" style={{ width: "100%", height: 60 }} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="card">
+          <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
+          <div className="skeleton" style={{ width: "100%", height: 60 }} />
+        </div>
+      ))}
     </div>
-  ) : !redditPost ? (
+  ) : redditPosts.length === 0 ? (
     <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
       <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-        No posts found.
+        No recent posts found.
       </p>
     </div>
   ) : (
-    <RedditEmbed post={redditPost} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {redditPosts.map((post, i) => (
+        <RedditEmbed key={i} post={post} />
+      ))}
+    </div>
   )}
 </div>
         </div>
