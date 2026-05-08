@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 
 // ─── Team data ───────────────────────────────────────────────────────────────
@@ -620,6 +620,7 @@ const TEAM_SUBREDDITS: Record<string, string> = {
   "26": "SFGiants",     "27": "ColoradoRockies",   "25": "Padres",
 };
 
+
 interface RedditPost {
   author: string;
   subreddit: string;
@@ -627,8 +628,8 @@ interface RedditPost {
   text: string;
   url: string;
   time: string;
+  embedHtml: string | null; 
 }
-
 function useRedditPost(teamId: string) {
   const [post, setPost] = useState<RedditPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -645,6 +646,63 @@ function useRedditPost(teamId: string) {
   }, [teamId]);
 
   return { post, loading };
+}
+// RedditEmbed component — paste this near your other components
+
+function RedditEmbed({ post }: { post: RedditPost }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!post.embedHtml || !containerRef.current) return;
+
+    // Inject the HTML
+    containerRef.current.innerHTML = post.embedHtml;
+
+    // Reddit's embed script won't re-run if already loaded, so we
+    // remove any existing instance and re-inject to activate the blockquote
+    const existingScript = document.getElementById("reddit-embed-script");
+    if (existingScript) existingScript.remove();
+
+    const script = document.createElement("script");
+    script.id = "reddit-embed-script";
+    script.src = "https://embed.reddit.com/widgets.js";
+    script.async = true;
+    script.charset = "UTF-8";
+    document.body.appendChild(script);
+  }, [post.embedHtml]);
+
+  // If oEmbed wasn't available, fall back to the custom card
+  if (!post.embedHtml) {
+    return (
+      <div className="card">
+        <div className="reddit-top">
+          <span className="reddit-author">{post.author}</span>
+          <div className="reddit-meta-right">
+            <span className="reddit-sub">{post.subreddit}</span>
+            <span className="reddit-upvotes">▲ {post.upvotes}</span>
+          </div>
+        </div>
+        <p className="reddit-text">{post.text}</p>
+        <div className="reddit-footer">
+          <span className="reddit-ago">{post.time}</span>
+          <a className="reddit-link" href={post.url} target="_blank" rel="noreferrer">
+            View thread →
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        // Reddit embeds have their own border/radius — just constrain width
+        width: "100%",
+        minHeight: 200,
+      }}
+    />
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -1100,7 +1158,7 @@ export default function TeamFeedPage() {
             </div>
           </div>
 
-          <div>
+       <div>
   <p className="section-label">Fan Hot Take</p>
   {redditLoading ? (
     <div className="card">
@@ -1114,22 +1172,7 @@ export default function TeamFeedPage() {
       </p>
     </div>
   ) : (
-    <div className="card">
-      <div className="reddit-top">
-        <span className="reddit-author">{redditPost.author}</span>
-        <div className="reddit-meta-right">
-          <span className="reddit-sub">{redditPost.subreddit}</span>
-          <span className="reddit-upvotes">▲ {redditPost.upvotes}</span>
-        </div>
-      </div>
-      <p className="reddit-text">{redditPost.text}</p>
-      <div className="reddit-footer">
-        <span className="reddit-ago">{redditPost.time}</span>
-        <a className="reddit-link" href={redditPost.url} target="_blank" rel="noreferrer">
-          View thread →
-        </a>
-      </div>
-    </div>
+    <RedditEmbed post={redditPost} />
   )}
 </div>
         </div>
