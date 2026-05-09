@@ -707,16 +707,176 @@ function RedditEmbed({ post }: { post: RedditPost }) {
   );
 }
 
+interface PlayerEntry {
+  order: number;
+  name: string;
+  hand: string;
+  position: string;
+}
+
+interface PitcherInfo {
+  name: string;
+  hand: string;
+  record: string;
+  era: string;
+  ip: string;
+  so: string;
+}
+
+interface TeamPreGame {
+  teamName: string;
+  winPct: number | null;
+  pitcher: PitcherInfo;
+  lineup: PlayerEntry[];
+}
+
+interface PreGameData {
+  away: TeamPreGame;
+  home: TeamPreGame;
+  isHome: boolean;
+}
+
+function usePreGameData(teamId: string, isScheduled: boolean) {
+  const [pregame, setPregame] = useState<PreGameData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isScheduled) { setLoading(false); return; }
+
+    const today = new Date().toISOString().split("T")[0];
+    fetch(`/api/pregame?teamId=${teamId}&date=${today}`)
+      .then(r => r.json())
+      .then(data => setPregame(data.pregame ?? null))
+      .catch(() => setPregame(null))
+      .finally(() => setLoading(false));
+  }, [teamId, isScheduled]);
+
+  return { pregame, loading };
+}
+
+
+function PreGamePanel({ pregame }: { pregame: PreGameData }) {
+  const { away, home } = pregame;
+
+  function TeamLineup({ team, label }: { team: TeamPreGame; label: "Away" | "Home" }) {
+    return (
+      <div style={{ flex: 1 }}>
+        {/* Team header */}
+        <div style={{
+          fontFamily: "'Oswald', sans-serif",
+          fontSize: 13, fontWeight: 600,
+          color: "#a1a1aa", letterSpacing: "0.06em",
+          textTransform: "uppercase", marginBottom: 8,
+        }}>
+          {label} · {team.teamName}
+          {team.winPct !== null && (
+            <span style={{ fontWeight: 400, marginLeft: 6, color: "#d4d4d8" }}>
+              {team.winPct}%
+            </span>
+          )}
+        </div>
+
+        {/* Pitcher */}
+        <div style={{
+          background: "var(--faint)", borderRadius: 10,
+          padding: "10px 12px", marginBottom: 10,
+        }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
+            letterSpacing: "0.12em", textTransform: "uppercase",
+            color: "#a1a1aa", marginBottom: 4,
+          }}>
+            Starting Pitcher
+          </div>
+          <div style={{
+            fontFamily: "'Oswald', sans-serif",
+            fontSize: 14, fontWeight: 600, color: "#18181b",
+          }}>
+            {team.pitcher.name}
+            {team.pitcher.hand && (
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 10, color: "#a1a1aa",
+                fontWeight: 400, marginLeft: 5,
+              }}>
+                ({team.pitcher.hand}HP)
+              </span>
+            )}
+          </div>
+          {team.pitcher.era && (
+            <div style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 11, color: "#71717a", marginTop: 3,
+            }}>
+              {team.pitcher.record} · {team.pitcher.era} ERA · {team.pitcher.ip} IP · {team.pitcher.so} K
+            </div>
+          )}
+        </div>
+
+        {/* Lineup */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {team.lineup.map((p) => (
+            <div key={p.order} style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "5px 0",
+              borderBottom: "1px solid #f4f4f5",
+            }}>
+              <span style={{
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: 11, fontWeight: 600,
+                color: "#d4d4d8", width: 14, flexShrink: 0,
+              }}>
+                {p.order}
+              </span>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 12, color: "#18181b", flex: 1,
+                fontWeight: 400,
+              }}>
+                {p.name}
+              </span>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 10, color: "#a1a1aa",
+                fontWeight: 500, width: 28, textAlign: "right",
+              }}>
+                {p.position}
+              </span>
+              <span style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 9, color: "#d4d4d8",
+                fontWeight: 600, width: 10,
+              }}>
+                {p.hand}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ display: "flex", gap: 20 }}>
+      <TeamLineup team={away} label="Away" />
+      <div style={{ width: 1, background: "#f4f4f5", flexShrink: 0 }} />
+      <TeamLineup team={home} label="Home" />
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function TeamFeedPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
+  
+   
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
   const { posts: redditPosts, loading: redditLoading } = useRedditPost(teamId);
-
+  const { pregame, loading: pregameLoading } = usePreGameData(teamId, gameData?.status === "Scheduled");
   if (!team) {
     return (
       <div style={{ padding: "48px", textAlign: "center", fontFamily: "sans-serif", color: "#18181b" }}>
@@ -1101,6 +1261,25 @@ export default function TeamFeedPage() {
               <LiveGamePanel teamId={teamId} isLive={true} />
             </div>
           )}
+          
+{gameData?.status === "Scheduled" && (
+  <div>
+    <p className="section-label">Today's Lineups</p>
+    {pregameLoading ? (
+      <div className="card">
+        <div className="skeleton" style={{ width: "100%", height: 300, borderRadius: 8 }} />
+      </div>
+    ) : pregame ? (
+      <PreGamePanel pregame={pregame} />
+    ) : (
+      <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+          Lineups not yet posted.
+        </p>
+      </div>
+    )}
+  </div>
+)}
           {/* ── Stat ── */}
           <div>
             <p className="section-label">Team Stat</p>
