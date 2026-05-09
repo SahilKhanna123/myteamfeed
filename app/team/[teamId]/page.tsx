@@ -49,30 +49,19 @@ interface GameData {
   awayTeam: { abbreviation: string; score: number | null };
   date: string;
   venue: string;
-  result: "W" | "L" | null; // relative to the page's team
+  result: "W" | "L" | null;
   isToday: boolean;
 }
 
-// ─── Mock data (stat / articles / fact / reddit unchanged) ────────────────────
+// ─── Mock data ────────────────────────────────────────────────────────────────
 const MOCK_STAT = {
   label: "Team ERA",
   value: "3.41",
   context: "3rd best in the AL",
 };
 
-
-
 const MOCK_FACT = {
   text: "Fenway Park's Green Monster is 37 feet 2 inches tall — originally built that height to block the view of non-paying fans watching from a hill outside the park.",
-};
-
-const MOCK_REDDIT = {
-  author: "u/FenwayFaithful_92",
-  subreddit: "r/redsox",
-  upvotes: "2.4k",
-  text: "I don't care what anyone says, this bullpen is actually built different this year. Three games in and I already trust them more than any Red Sox pen since 2018. Don't @ me.",
-  url: "https://reddit.com/r/redsox",
-  time: "4h ago",
 };
 
 // ─── Helper: parse a competition object into GameData ────────────────────────
@@ -84,13 +73,11 @@ function parseCompetition(
   const home = comp.competitors.find((c: any) => c.homeAway === "home");
   const away = comp.competitors.find((c: any) => c.homeAway === "away");
   const statusState: string = comp.status?.type?.state ?? "pre";
-  const statusName: string = comp.status?.type?.name ?? "";
 
   let status: GameStatus = "Scheduled";
   if (statusState === "in") status = "Live";
   else if (statusState === "post") status = "Final";
 
-  // Inning display for live games
   let inning: string | null = null;
   if (status === "Live") {
     const period = comp.status?.period ?? "";
@@ -101,7 +88,6 @@ function parseCompetition(
   const homeScore = home?.score != null ? parseInt(home.score, 10) : null;
   const awayScore = away?.score != null ? parseInt(away.score, 10) : null;
 
-  // Determine W/L from the page team's perspective
   let result: "W" | "L" | null = null;
   if (status === "Final" && homeScore != null && awayScore != null) {
     const pageTeamIsHome = home?.id === teamId || home?.team?.id === teamId;
@@ -110,7 +96,6 @@ function parseCompetition(
     result = pageTeamScore > opponentScore ? "W" : "L";
   }
 
-  // Date formatting
   const rawDate = comp.date ?? comp.startDate ?? "";
   const dateStr = rawDate
     ? new Date(rawDate).toLocaleDateString("en-US", {
@@ -120,7 +105,6 @@ function parseCompetition(
       })
     : "TBD";
 
-  // Scheduled time for display
   let displayDate = dateStr;
   if (status === "Scheduled" && rawDate) {
     const timeStr = new Date(rawDate).toLocaleTimeString("en-US", {
@@ -179,7 +163,30 @@ function useGameData(teamId: string) {
           return;
         }
 
-        // Step 2 — no game today, fetch team schedule and find last completed game
+        // Step 2 — no game today, pull last game from team endpoint
+        const teamRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}`
+        );
+        const teamJson = await teamRes.json();
+
+        const nextEvent = teamJson.team?.nextEvent?.[0];
+        const lastGame  = teamJson.team?.record; // not useful for scores
+
+        // The team endpoint exposes `nextEvent` but not last game directly.
+        // However `teamJson.team?.links` won't help either — use the
+        // `previousEvents` if present, otherwise fall back to schedule.
+        const previousEvents: any[] = teamJson.team?.previousEvents ?? [];
+
+        if (previousEvents.length > 0) {
+          const comp = previousEvents[0]?.competitions?.[0];
+          if (comp) {
+            setGameData(parseCompetition(comp, teamId, false));
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Step 3 — true fallback: schedule endpoint + summary re-fetch
         const scheduleRes = await fetch(
           `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}/schedule`
         );
@@ -194,58 +201,17 @@ function useGameData(teamId: string) {
           );
 
         if (completed.length > 0) {
-          const comp = completed[0].competitions[0];
-
-          // ── The schedule endpoint puts scores differently ──
-          // competitors[].score is a string like "5", but sometimes missing
-          // so we parse it safely here instead of in parseCompetition
-          const home = comp.competitors.find((c: any) => c.homeAway === "home");
-          const away = comp.competitors.find((c: any) => c.homeAway === "away");
-
-          const homeScore = home?.score !== undefined && home?.score !== ""
-            ? parseInt(home.score, 10)
-            : null;
-          const awayScore = away?.score !== undefined && away?.score !== ""
-            ? parseInt(away.score, 10)
-            : null;
-
-          // If scores are still NaN, try linescores sum as fallback
-          const homeScoreFinal = (!isNaN(homeScore as number) && homeScore !== null)
-            ? homeScore
-            : (home?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
-          const awayScoreFinal = (!isNaN(awayScore as number) && awayScore !== null)
-            ? awayScore
-            : (away?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
-
-          const statusState = comp.status?.type?.state ?? "post";
-          const rawDate = comp.date ?? "";
-          const dateStr = rawDate
-            ? new Date(rawDate).toLocaleDateString("en-US", {
-                month: "short", day: "numeric", year: "numeric",
-              })
-            : "TBD";
-
-          const pageTeamIsHome = home?.id === teamId || home?.team?.id === teamId;
-          const pageTeamScore = pageTeamIsHome ? homeScoreFinal : awayScoreFinal;
-          const opponentScore = pageTeamIsHome ? awayScoreFinal : homeScoreFinal;
-          const result: "W" | "L" = pageTeamScore > opponentScore ? "W" : "L";
-
-          setGameData({
-            status: "Final",
-            inning: null,
-            homeTeam: {
-              abbreviation: home?.team?.abbreviation ?? "???",
-              score: homeScoreFinal,
-            },
-            awayTeam: {
-              abbreviation: away?.team?.abbreviation ?? "???",
-              score: awayScoreFinal,
-            },
-            date: dateStr,
-            venue: comp.venue?.fullName ?? "TBD",
-            result,
-            isToday: false,
-          });
+          const lastEventId = completed[0].id;
+          const summaryRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${lastEventId}`
+          );
+          const summaryJson = await summaryRes.json();
+          const comp = summaryJson.header?.competitions?.[0];
+          if (comp) {
+            setGameData(parseCompetition(comp, teamId, false));
+          } else {
+            setGameData(null);
+          }
         } else {
           setGameData(null);
         }
@@ -270,11 +236,11 @@ interface Article {
   url: string;
   time: string;
 }
- 
+
 function useNewsData(teamName: string, teamCity: string) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
- 
+
   useEffect(() => {
     async function load() {
       try {
@@ -291,21 +257,21 @@ function useNewsData(teamName: string, teamCity: string) {
     }
     load();
   }, [teamName, teamCity]);
- 
+
   return { articles, loading };
 }
+
 // ─── Live Game Panel ──────────────────────────────────────────────────────────
 interface LiveData {
   currentPitcher: { name: string; summary: string };
   currentBatter:  { name: string; summary: string };
   bases:          { first: boolean; second: boolean; third: boolean };
   count:          { balls: number; strikes: number; outs: number };
-  inningDetail:   string;   // "Bottom 4th"
+  inningDetail:   string;
   currentInning:  number;
   lastPlay:       string | null;
   gamePk:         string | null;
 }
-
 
 function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData | null; loading: boolean } {
   const [liveData, setLiveData] = useState<LiveData | null>(null);
@@ -341,51 +307,35 @@ function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData 
         const situation = comp.situation ?? {};
         const status = comp.status ?? {};
 
-        // ── Pitcher ──
-        // name comes from athlete.displayName
-        // stats come from pitcher.summary e.g. "3.1 IP, 3 ER, 3 H, 5 K, 3 BB"
         const pitcherAthlete = situation.pitcher?.athlete ?? null;
         const pitcherSummary: string = situation.pitcher?.summary ?? "";
-
-        // ── Batter ──
-        // stats come from batter.summary e.g. "0-2, 2 K"
         const batterAthlete = situation.batter?.athlete ?? null;
         const batterSummary: string = situation.batter?.summary ?? "";
 
-        // ── Bases ──
-        // onFirst/onSecond/onThird are booleans directly on situation
         const bases = {
           first:  !!situation.onFirst,
           second: !!situation.onSecond,
           third:  !!situation.onThird,
         };
 
-        // ── Count ──
-        // balls, strikes, outs are directly on situation
         const count = {
           balls:   situation.balls   ?? 0,
           strikes: situation.strikes ?? 0,
           outs:    situation.outs    ?? 0,
         };
 
-        // ── Inning ──
-        // "Bottom 4th" is at status.type.detail
-        // "Bot 4th" is at status.type.shortDetail
         const inningDetail: string = status.type?.detail ?? "";
         const currentInning: number = status.period ?? 0;
-
-        // ── Last play ──
-        // situation.lastPlay.text e.g. "Brandon Pfaadt pitches to Trea Turner"
         const lastPlay: string | null = situation.lastPlay?.text ?? null;
 
         setLiveData({
           currentPitcher: {
-            name:       pitcherAthlete?.displayName ?? "—",
-            summary:    pitcherSummary,   // "3.1 IP, 3 ER, 3 H, 5 K, 3 BB"
+            name:    pitcherAthlete?.displayName ?? "—",
+            summary: pitcherSummary,
           },
           currentBatter: {
-            name:       batterAthlete?.displayName ?? "—",
-            summary:    batterSummary,    // "0-2, 2 K"
+            name:    batterAthlete?.displayName ?? "—",
+            summary: batterSummary,
           },
           bases,
           count,
@@ -409,32 +359,15 @@ function useLiveGameData(teamId: string, isLive: boolean): { liveData: LiveData 
 
   return { liveData, loading };
 }
+
 function BaseDiamond({ bases }: { bases: { first: boolean; second: boolean; third: boolean } }) {
   const color = "var(--color)";
   const empty = "#e4e4e7";
   return (
     <svg width="54" height="54" viewBox="0 0 54 54" style={{ flexShrink: 0 }}>
-      {/* Second base — top */}
-      <rect
-        x="19" y="2" width="16" height="16"
-        rx="2"
-        transform="rotate(45 27 10)"
-        fill={bases.second ? color : empty}
-      />
-      {/* Third base — left */}
-      <rect
-        x="2" y="19" width="16" height="16"
-        rx="2"
-        transform="rotate(45 10 27)"
-        fill={bases.third ? color : empty}
-      />
-      {/* First base — right */}
-      <rect
-        x="36" y="19" width="16" height="16"
-        rx="2"
-        transform="rotate(45 44 27)"
-        fill={bases.first ? color : empty}
-      />
+      <rect x="19" y="2" width="16" height="16" rx="2" transform="rotate(45 27 10)" fill={bases.second ? color : empty} />
+      <rect x="2" y="19" width="16" height="16" rx="2" transform="rotate(45 10 27)" fill={bases.third ? color : empty} />
+      <rect x="36" y="19" width="16" height="16" rx="2" transform="rotate(45 44 27)" fill={bases.first ? color : empty} />
     </svg>
   );
 }
@@ -458,155 +391,69 @@ function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) 
 
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-      {/* ── Header: inning + count ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{
-          fontFamily: "'Oswald', sans-serif",
-          fontSize: 13, fontWeight: 600,
-          color: "var(--color)", letterSpacing: "0.04em",
-          textTransform: "uppercase"
-        }}>
+        <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 600, color: "var(--color)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
           {inningDetail}
         </span>
-        <span style={{
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: 11, color: "#71717a", fontWeight: 500
-        }}>
+        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#71717a", fontWeight: 500 }}>
           {count.balls}-{count.strikes} &nbsp;·&nbsp; {count.outs} {count.outs === 1 ? "out" : "outs"}
         </span>
       </div>
 
-      {/* ── Main row: pitcher | diamond | batter ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-
-        {/* Pitcher */}
         <div style={{ flex: 1, background: "var(--faint)", borderRadius: 12, padding: "12px 14px" }}>
-          <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5
-          }}>
-            Pitching
-          </div>
-          <div style={{
-            fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600,
-            color: "#18181b", lineHeight: 1.2, marginBottom: 6
-          }}>
-            {currentPitcher.name}
-          </div>
-          <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 11,
-            color: "#71717a", lineHeight: 1.4
-          }}>
-            {currentPitcher.summary}
-          </div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5 }}>Pitching</div>
+          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600, color: "#18181b", lineHeight: 1.2, marginBottom: 6 }}>{currentPitcher.name}</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#71717a", lineHeight: 1.4 }}>{currentPitcher.summary}</div>
         </div>
 
-        {/* Base diamond */}
         <BaseDiamond bases={bases} />
 
-        {/* Batter */}
         <div style={{ flex: 1, background: "var(--faint)", borderRadius: 12, padding: "12px 14px" }}>
-          <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5
-          }}>
-            At Bat
-          </div>
-          <div style={{
-            fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600,
-            color: "#18181b", lineHeight: 1.2, marginBottom: 6
-          }}>
-            {currentBatter.name}
-          </div>
-          <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 11,
-            color: "#71717a", lineHeight: 1.4
-          }}>
-            {currentBatter.summary}
-          </div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 5 }}>At Bat</div>
+          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600, color: "#18181b", lineHeight: 1.2, marginBottom: 6 }}>{currentBatter.name}</div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#71717a", lineHeight: 1.4 }}>{currentBatter.summary}</div>
         </div>
-
       </div>
 
-      {/* ── Last play ── */}
       {lastPlay && (
-        <div style={{
-          paddingTop: 12, borderTop: "1px solid #f4f4f5",
-          fontFamily: "'DM Sans', sans-serif", fontSize: 12,
-          color: "#71717a", lineHeight: 1.5
-        }}>
-          <span style={{
-            fontWeight: 600, color: "#a1a1aa",
-            textTransform: "uppercase", fontSize: 9, letterSpacing: "0.1em"
-          }}>
-            Last Play ·{" "}
-          </span>
+        <div style={{ paddingTop: 12, borderTop: "1px solid #f4f4f5", fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#71717a", lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 600, color: "#a1a1aa", textTransform: "uppercase", fontSize: 9, letterSpacing: "0.1em" }}>Last Play · </span>
           {lastPlay}
         </div>
       )}
-      {/* ── Count indicators ── */}
-      <div style={{
-        paddingTop: 12, borderTop: "1px solid #f4f4f5",
-        display: "flex", alignItems: "center", justifyContent: "space-around",
-      }}>
 
-        {/* Balls */}
+      <div style={{ paddingTop: 12, borderTop: "1px solid #f4f4f5", display: "flex", alignItems: "center", justifyContent: "space-around" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <div style={{ display: "flex", gap: 5 }}>
             {[0,1,2,3].map((i) => (
-              <div key={i} style={{
-                width: 12, height: 12, borderRadius: "50%",
-                background: i < count.balls ? "#16a34a" : "#e4e4e7",
-                transition: "background 0.2s",
-              }} />
+              <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: i < count.balls ? "#16a34a" : "#e4e4e7", transition: "background 0.2s" }} />
             ))}
           </div>
-          <span style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
-          }}>Balls</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa" }}>Balls</span>
         </div>
-
-        {/* Strikes */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <div style={{ display: "flex", gap: 5 }}>
             {[0,1,2].map((i) => (
-              <div key={i} style={{
-                width: 12, height: 12, borderRadius: "50%",
-                background: i < count.strikes ? "#dc2626" : "#e4e4e7",
-                transition: "background 0.2s",
-              }} />
+              <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: i < count.strikes ? "#dc2626" : "#e4e4e7", transition: "background 0.2s" }} />
             ))}
           </div>
-          <span style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
-          }}>Strikes</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa" }}>Strikes</span>
         </div>
-
-        {/* Outs */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
           <div style={{ display: "flex", gap: 5 }}>
             {[0,1,2].map((i) => (
-              <div key={i} style={{
-                width: 12, height: 12, borderRadius: "50%",
-                background: i < count.outs ? "#f59e0b" : "#e4e4e7",
-                transition: "background 0.2s",
-              }} />
+              <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: i < count.outs ? "#f59e0b" : "#e4e4e7", transition: "background 0.2s" }} />
             ))}
           </div>
-          <span style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa"
-          }}>Outs</span>
+          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa" }}>Outs</span>
         </div>
-
       </div>
-
     </div>
   );
-}// ─── Reddit ───────────────────────────────────────────────────────────────────
+}
+
+// ─── Reddit ───────────────────────────────────────────────────────────────────
 const TEAM_SUBREDDITS: Record<string, string> = {
   "2":  "redsox",       "10": "NYYankees",        "14": "Torontobluejays",
   "1":  "orioles",      "30": "TampaBayRays",      "5":  "ClevelandGuardians",
@@ -620,7 +467,6 @@ const TEAM_SUBREDDITS: Record<string, string> = {
   "26": "SFGiants",     "27": "ColoradoRockies",   "25": "Padres",
 };
 
-
 interface RedditPost {
   author: string;
   subreddit: string;
@@ -631,7 +477,6 @@ interface RedditPost {
   embedHtml: string | null;
 }
 
-// Update hook — returns posts array
 function useRedditPost(teamId: string) {
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -649,7 +494,6 @@ function useRedditPost(teamId: string) {
 
   return { posts, loading };
 }
-// RedditEmbed component — paste this near your other components
 
 function RedditEmbed({ post }: { post: RedditPost }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -657,11 +501,8 @@ function RedditEmbed({ post }: { post: RedditPost }) {
   useEffect(() => {
     if (!post.embedHtml || !containerRef.current) return;
 
-    // Inject the HTML
     containerRef.current.innerHTML = post.embedHtml;
 
-    // Reddit's embed script won't re-run if already loaded, so we
-    // remove any existing instance and re-inject to activate the blockquote
     const existingScript = document.getElementById("reddit-embed-script");
     if (existingScript) existingScript.remove();
 
@@ -673,7 +514,6 @@ function RedditEmbed({ post }: { post: RedditPost }) {
     document.body.appendChild(script);
   }, [post.embedHtml]);
 
-  // If oEmbed wasn't available, fall back to the custom card
   if (!post.embedHtml) {
     return (
       <div className="card">
@@ -687,26 +527,18 @@ function RedditEmbed({ post }: { post: RedditPost }) {
         <p className="reddit-text">{post.text}</p>
         <div className="reddit-footer">
           <span className="reddit-ago">{post.time}</span>
-          <a className="reddit-link" href={post.url} target="_blank" rel="noreferrer">
-            View thread →
-          </a>
+          <a className="reddit-link" href={post.url} target="_blank" rel="noreferrer">View thread →</a>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        // Reddit embeds have their own border/radius — just constrain width
-        width: "100%",
-        minHeight: 200,
-      }}
-    />
+    <div ref={containerRef} style={{ width: "100%", minHeight: 200 }} />
   );
 }
 
+// ─── Pre-game ─────────────────────────────────────────────────────────────────
 interface PlayerEntry {
   order: number;
   name: string;
@@ -754,101 +586,43 @@ function usePreGameData(teamId: string, isScheduled: boolean) {
   return { pregame, loading };
 }
 
-
 function PreGamePanel({ pregame }: { pregame: PreGameData }) {
   const { away, home } = pregame;
 
   function TeamLineup({ team, label }: { team: TeamPreGame; label: "Away" | "Home" }) {
     return (
       <div style={{ flex: 1 }}>
-        {/* Team header */}
-        <div style={{
-          fontFamily: "'Oswald', sans-serif",
-          fontSize: 13, fontWeight: 600,
-          color: "#a1a1aa", letterSpacing: "0.06em",
-          textTransform: "uppercase", marginBottom: 8,
-        }}>
+        <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 600, color: "#a1a1aa", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
           {label} · {team.teamName}
           {team.winPct !== null && (
-            <span style={{ fontWeight: 400, marginLeft: 6, color: "#d4d4d8" }}>
-              {team.winPct}%
-            </span>
+            <span style={{ fontWeight: 400, marginLeft: 6, color: "#d4d4d8" }}>{team.winPct}%</span>
           )}
         </div>
 
-        {/* Pitcher */}
-        <div style={{
-          background: "var(--faint)", borderRadius: 10,
-          padding: "10px 12px", marginBottom: 10,
-        }}>
-          <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600,
-            letterSpacing: "0.12em", textTransform: "uppercase",
-            color: "#a1a1aa", marginBottom: 4,
-          }}>
+        <div style={{ background: "var(--faint)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: 4 }}>
             Starting Pitcher
           </div>
-          <div style={{
-            fontFamily: "'Oswald', sans-serif",
-            fontSize: 14, fontWeight: 600, color: "#18181b",
-          }}>
+          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 600, color: "#18181b" }}>
             {team.pitcher.name}
             {team.pitcher.hand && (
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 10, color: "#a1a1aa",
-                fontWeight: 400, marginLeft: 5,
-              }}>
-                ({team.pitcher.hand}HP)
-              </span>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "#a1a1aa", fontWeight: 400, marginLeft: 5 }}>({team.pitcher.hand}HP)</span>
             )}
           </div>
           {team.pitcher.era && (
-            <div style={{
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 11, color: "#71717a", marginTop: 3,
-            }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "#71717a", marginTop: 3 }}>
               {team.pitcher.record} · {team.pitcher.era} ERA · {team.pitcher.ip} IP · {team.pitcher.so} K
             </div>
           )}
         </div>
 
-        {/* Lineup */}
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           {team.lineup.map((p) => (
-            <div key={p.order} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "5px 0",
-              borderBottom: "1px solid #f4f4f5",
-            }}>
-              <span style={{
-                fontFamily: "'Oswald', sans-serif",
-                fontSize: 11, fontWeight: 600,
-                color: "#d4d4d8", width: 14, flexShrink: 0,
-              }}>
-                {p.order}
-              </span>
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 12, color: "#18181b", flex: 1,
-                fontWeight: 400,
-              }}>
-                {p.name}
-              </span>
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 10, color: "#a1a1aa",
-                fontWeight: 500, width: 28, textAlign: "right",
-              }}>
-                {p.position}
-              </span>
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 9, color: "#d4d4d8",
-                fontWeight: 600, width: 10,
-              }}>
-                {p.hand}
-              </span>
+            <div key={p.order} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #f4f4f5" }}>
+              <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, color: "#d4d4d8", width: 14, flexShrink: 0 }}>{p.order}</span>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#18181b", flex: 1, fontWeight: 400 }}>{p.name}</span>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "#a1a1aa", fontWeight: 500, width: 28, textAlign: "right" }}>{p.position}</span>
+              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9, color: "#d4d4d8", fontWeight: 600, width: 10 }}>{p.hand}</span>
             </div>
           ))}
         </div>
@@ -871,12 +645,12 @@ export default function TeamFeedPage() {
   const router = useRouter();
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
-  
-   
+
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
   const { posts: redditPosts, loading: redditLoading } = useRedditPost(teamId);
   const { pregame, loading: pregameLoading } = usePreGameData(teamId, gameData?.status === "Scheduled");
+
   if (!team) {
     return (
       <div style={{ padding: "48px", textAlign: "center", fontFamily: "sans-serif", color: "#18181b" }}>
@@ -899,36 +673,22 @@ export default function TeamFeedPage() {
 
         .page { min-height: 100vh; background: #fafafa; padding-bottom: 80px; }
 
-        .hero {
-          background: #fff;
-          border-bottom: 1px solid #e4e4e7;
-          padding: 32px 24px 28px;
-        }
+        .hero { background: #fff; border-bottom: 1px solid #e4e4e7; padding: 32px 24px 28px; }
         .hero-inner { max-width: 680px; margin: 0 auto; }
 
         .back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px;
-          color: #a1a1aa;
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          margin-bottom: 18px;
-          transition: color 0.15s;
+          display: inline-flex; align-items: center; gap: 5px;
+          font-family: 'DM Sans', sans-serif; font-size: 12px; color: #a1a1aa;
+          background: none; border: none; cursor: pointer; padding: 0;
+          margin-bottom: 18px; transition: color 0.15s;
         }
         .back-btn:hover { color: #18181b; }
 
         .team-identity { display: flex; align-items: center; gap: 14px; }
 
         .team-logo-circle {
-          width: 60px; height: 60px;
-          border-radius: 50%;
-          background: var(--faint);
-          border: 2px solid var(--faint);
+          width: 60px; height: 60px; border-radius: 50%;
+          background: var(--faint); border: 2px solid var(--faint);
           display: flex; align-items: center; justify-content: center;
           overflow: hidden; flex-shrink: 0;
         }
@@ -936,13 +696,9 @@ export default function TeamFeedPage() {
         .team-name {
           font-family: 'Oswald', sans-serif;
           font-size: clamp(26px, 5vw, 40px);
-          font-weight: 700; color: #18181b;
-          line-height: 1; letter-spacing: -0.01em;
+          font-weight: 700; color: #18181b; line-height: 1; letter-spacing: -0.01em;
         }
-        .team-sub {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px; color: #a1a1aa; margin-top: 4px;
-        }
+        .team-sub { font-family: 'DM Sans', sans-serif; font-size: 12px; color: #a1a1aa; margin-top: 4px; }
 
         .feed {
           max-width: 680px; margin: 0 auto;
@@ -951,24 +707,14 @@ export default function TeamFeedPage() {
         }
 
         .section-label {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 10px; font-weight: 500;
-          letter-spacing: 0.14em; text-transform: uppercase;
-          color: #a1a1aa; margin-bottom: 8px;
-          display: flex; align-items: center; gap: 8px;
+          font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 500;
+          letter-spacing: 0.14em; text-transform: uppercase; color: #a1a1aa;
+          margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
         }
-        .section-label::after {
-          content: ''; flex: 1; height: 1px; background: #e4e4e7;
-        }
+        .section-label::after { content: ''; flex: 1; height: 1px; background: #e4e4e7; }
 
-        .card {
-          background: #fff;
-          border: 1.5px solid #e4e4e7;
-          border-radius: 16px;
-          padding: 20px;
-        }
+        .card { background: #fff; border: 1.5px solid #e4e4e7; border-radius: 16px; padding: 20px; }
 
-        /* Score skeleton */
         .skeleton {
           background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
           background-size: 200% 100%;
@@ -983,20 +729,17 @@ export default function TeamFeedPage() {
         .score-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 
         .status-pill {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px; font-weight: 500;
+          font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500;
           letter-spacing: 0.07em; text-transform: uppercase;
           padding: 3px 10px; border-radius: 100px;
         }
-        .pill-final    { background: #f4f4f5; color: #71717a; }
-        .pill-live     { background: #fef2f2; color: #dc2626; }
+        .pill-final     { background: #f4f4f5; color: #71717a; }
+        .pill-live      { background: #fef2f2; color: #dc2626; }
         .pill-scheduled { background: #eff6ff; color: #2563eb; }
 
         .result-badge {
-          font-family: 'Oswald', sans-serif;
-          font-size: 13px; font-weight: 700;
-          letter-spacing: 0.05em;
-          padding: 3px 12px; border-radius: 100px;
+          font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700;
+          letter-spacing: 0.05em; padding: 3px 12px; border-radius: 100px;
         }
         .badge-w { background: #f0fdf4; color: #16a34a; }
         .badge-l { background: #fef2f2; color: #dc2626; }
@@ -1005,122 +748,58 @@ export default function TeamFeedPage() {
         .score-team { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
 
         .score-logo {
-          width: 42px; height: 42px; border-radius: 50%;
-          background: #f4f4f5;
-          display: flex; align-items: center; justify-content: center;
-          overflow: hidden;
+          width: 42px; height: 42px; border-radius: 50%; background: #f4f4f5;
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
-        .score-abbr {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px; font-weight: 500; color: #71717a;
-          letter-spacing: 0.04em;
-        }
-        .score-num {
-          font-family: 'Oswald', sans-serif;
-          font-size: 48px; font-weight: 700; line-height: 1; color: #18181b;
-        }
+        .score-abbr { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 500; color: #71717a; letter-spacing: 0.04em; }
+        .score-num { font-family: 'Oswald', sans-serif; font-size: 48px; font-weight: 700; line-height: 1; color: #18181b; }
         .score-num.muted { color: #d4d4d8; }
-        .score-sep {
-          font-family: 'Oswald', sans-serif;
-          font-size: 32px; font-weight: 300; color: #e4e4e7;
-          padding: 0 12px; padding-bottom: 14px;
-        }
+        .score-sep { font-family: 'Oswald', sans-serif; font-size: 32px; font-weight: 300; color: #e4e4e7; padding: 0 12px; padding-bottom: 14px; }
         .score-footer {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px; color: #a1a1aa;
-          text-align: center; margin-top: 16px;
-          padding-top: 14px; border-top: 1px solid #f4f4f5;
+          font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa;
+          text-align: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid #f4f4f5;
         }
 
         .stat-row { display: flex; align-items: center; gap: 14px; }
         .stat-icon-box {
-          width: 46px; height: 46px; border-radius: 12px;
-          background: var(--faint);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 22px; flex-shrink: 0;
+          width: 46px; height: 46px; border-radius: 12px; background: var(--faint);
+          display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
         }
-        .stat-val {
-          font-family: 'Oswald', sans-serif;
-          font-size: 34px; font-weight: 700; color: var(--color); line-height: 1;
-        }
-        .stat-lbl {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px; font-weight: 500; color: #18181b; margin-top: 3px;
-        }
-        .stat-ctx {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 11px; color: #a1a1aa; margin-top: 2px;
-        }
+        .stat-val { font-family: 'Oswald', sans-serif; font-size: 34px; font-weight: 700; color: var(--color); line-height: 1; }
+        .stat-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #18181b; margin-top: 3px; }
+        .stat-ctx { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; margin-top: 2px; }
 
         .articles-stack { display: flex; flex-direction: column; gap: 10px; }
         .article-card {
-          background: #fff; border: 1.5px solid #e4e4e7;
-          border-radius: 16px; padding: 18px 20px;
-          cursor: pointer;
-          transition: border-color 0.15s, box-shadow 0.15s;
+          background: #fff; border: 1.5px solid #e4e4e7; border-radius: 16px; padding: 18px 20px;
+          cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
           display: flex; flex-direction: column; gap: 7px;
         }
-        .article-card:hover {
-          border-color: var(--color);
-          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-        }
+        .article-card:hover { border-color: var(--color); box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
         .article-row1 { display: flex; align-items: center; justify-content: space-between; }
-        .article-source {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 10px; font-weight: 600;
-          letter-spacing: 0.1em; text-transform: uppercase; color: var(--color);
-        }
+        .article-source { font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color); }
         .article-time { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
-        .article-title {
-          font-family: 'Oswald', sans-serif;
-          font-size: 16px; font-weight: 600; color: #18181b;
-          line-height: 1.25; letter-spacing: 0.01em;
-        }
-        .article-summary {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13px; color: #71717a; line-height: 1.55; font-weight: 300;
-        }
-        .article-cta {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px; font-weight: 500; color: var(--color); margin-top: 2px;
-        }
+        .article-title { font-family: 'Oswald', sans-serif; font-size: 16px; font-weight: 600; color: #18181b; line-height: 1.25; letter-spacing: 0.01em; }
+        .article-summary { font-family: 'DM Sans', sans-serif; font-size: 13px; color: #71717a; line-height: 1.55; font-weight: 300; }
+        .article-cta { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--color); margin-top: 2px; }
 
         .fact-card {
           background: var(--faint); border: 1.5px solid #e4e4e7;
-          border-left: 4px solid var(--color);
-          border-radius: 0 16px 16px 0; padding: 18px 20px;
+          border-left: 4px solid var(--color); border-radius: 0 16px 16px 0; padding: 18px 20px;
         }
-        .fact-eyebrow {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 10px; font-weight: 600;
-          letter-spacing: 0.12em; text-transform: uppercase;
-          color: var(--color); margin-bottom: 8px;
-        }
-        .fact-text {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px; color: #3f3f46; line-height: 1.65;
-        }
+        .fact-eyebrow { font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color); margin-bottom: 8px; }
+        .fact-text { font-family: 'DM Sans', sans-serif; font-size: 14px; color: #3f3f46; line-height: 1.65; }
 
         .reddit-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .reddit-author { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: #FF4500; }
         .reddit-meta-right { display: flex; align-items: center; gap: 10px; }
         .reddit-sub, .reddit-upvotes { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
-        .reddit-text {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px; color: #18181b; line-height: 1.65; font-style: italic;
-        }
+        .reddit-text { font-family: 'DM Sans', sans-serif; font-size: 14px; color: #18181b; line-height: 1.65; font-style: italic; }
         .reddit-text::before { content: '"'; }
         .reddit-text::after  { content: '"'; }
-        .reddit-footer {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-top: 12px; padding-top: 12px; border-top: 1px solid #f4f4f5;
-        }
+        .reddit-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f4f4f5; }
         .reddit-ago { font-family: 'DM Sans', sans-serif; font-size: 11px; color: #a1a1aa; }
-        .reddit-link {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 12px; font-weight: 500; color: #FF4500;
-          text-decoration: none; cursor: pointer;
-        }
+        .reddit-link { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: #FF4500; text-decoration: none; cursor: pointer; }
 
         @media (max-width: 480px) {
           .hero { padding: 20px 16px; }
@@ -1136,9 +815,7 @@ export default function TeamFeedPage() {
         {/* ── Hero ── */}
         <div className="hero">
           <div className="hero-inner">
-            <button className="back-btn" onClick={() => router.push("/mlb")}>
-              ← All Teams
-            </button>
+            <button className="back-btn" onClick={() => router.push("/mlb")}>← All Teams</button>
             <div className="team-identity">
               <div className="team-logo-circle">
                 <Image
@@ -1166,7 +843,6 @@ export default function TeamFeedPage() {
             </p>
 
             {gameLoading ? (
-              /* Skeleton */
               <div className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
                   <div className="skeleton" style={{ width: 60, height: 22 }} />
@@ -1189,9 +865,7 @@ export default function TeamFeedPage() {
               </div>
             ) : !gameData ? (
               <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-                  No recent game data available.
-                </p>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>No recent game data available.</p>
               </div>
             ) : (
               <div className="card">
@@ -1225,7 +899,13 @@ export default function TeamFeedPage() {
                       />
                     </div>
                     <span className="score-abbr">{gameData.awayTeam.abbreviation}</span>
-                    <span className={`score-num ${gameData.status !== "Scheduled" && gameData.result !== null && !isWin && gameData.awayTeam.abbreviation !== team.abbreviation ? "" : gameData.status !== "Scheduled" && gameData.awayTeam.score !== null && gameData.homeTeam.score !== null && gameData.awayTeam.score < gameData.homeTeam.score ? "muted" : ""}`}>
+                    <span className={`score-num ${
+                      gameData.status === "Final" &&
+                      gameData.status !== "Scheduled" &&
+                      gameData.awayTeam.score !== null &&
+                      gameData.homeTeam.score !== null &&
+                      gameData.awayTeam.score < gameData.homeTeam.score ? "muted" : ""
+                    }`}>
                       {gameData.status === "Scheduled" ? "–" : (gameData.awayTeam.score ?? "–")}
                     </span>
                   </div>
@@ -1243,7 +923,13 @@ export default function TeamFeedPage() {
                       />
                     </div>
                     <span className="score-abbr">{gameData.homeTeam.abbreviation}</span>
-                    <span className={`score-num ${gameData.status !== "Scheduled" && gameData.homeTeam.score !== null && gameData.awayTeam.score !== null && gameData.homeTeam.score < gameData.awayTeam.score ? "muted" : ""}`}>
+                    <span className={`score-num ${
+                      gameData.status === "Final" &&
+                      gameData.status !== "Scheduled" &&
+                      gameData.homeTeam.score !== null &&
+                      gameData.awayTeam.score !== null &&
+                      gameData.homeTeam.score < gameData.awayTeam.score ? "muted" : ""
+                    }`}>
                       {gameData.status === "Scheduled" ? "–" : (gameData.homeTeam.score ?? "–")}
                     </span>
                   </div>
@@ -1255,31 +941,33 @@ export default function TeamFeedPage() {
               </div>
             )}
           </div>
+
+          {/* ── Live Panel ── */}
           {gameData?.status === "Live" && (
             <div>
               <p className="section-label">Live · In-Game</p>
               <LiveGamePanel teamId={teamId} isLive={true} />
             </div>
           )}
-          
-{gameData?.status === "Scheduled" && (
-  <div>
-    <p className="section-label">Today's Lineups</p>
-    {pregameLoading ? (
-      <div className="card">
-        <div className="skeleton" style={{ width: "100%", height: 300, borderRadius: 8 }} />
-      </div>
-    ) : pregame ? (
-      <PreGamePanel pregame={pregame} />
-    ) : (
-      <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
-        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-          Lineups not yet posted.
-        </p>
-      </div>
-    )}
-  </div>
-)}
+
+          {/* ── Pre-game Lineups ── */}
+          {gameData?.status === "Scheduled" && (
+            <div>
+              <p className="section-label">Today's Lineups</p>
+              {pregameLoading ? (
+                <div className="card">
+                  <div className="skeleton" style={{ width: "100%", height: 300, borderRadius: 8 }} />
+                </div>
+              ) : pregame ? (
+                <PreGamePanel pregame={pregame} />
+              ) : (
+                <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>Lineups not yet posted.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Stat ── */}
           <div>
             <p className="section-label">Team Stat</p>
@@ -1303,18 +991,12 @@ export default function TeamFeedPage() {
               </div>
             ) : articles.length === 0 ? (
               <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
-                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-                  No recent articles found.
-                </p>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>No recent articles found.</p>
               </div>
             ) : (
               <div className="articles-stack">
                 {articles.map((a) => (
-                  <div
-                    key={a.id}
-                    className="article-card"
-                    onClick={() => window.open(a.url, "_blank")}
-                  >
+                  <div key={a.id} className="article-card" onClick={() => window.open(a.url, "_blank")}>
                     <div className="article-row1">
                       <span className="article-source">{a.source}</span>
                       <span className="article-time">{a.time}</span>
@@ -1328,8 +1010,6 @@ export default function TeamFeedPage() {
             )}
           </div>
 
- 
-         
           {/* ── Fact ── */}
           <div>
             <p className="section-label">Did You Know</p>
@@ -1339,31 +1019,31 @@ export default function TeamFeedPage() {
             </div>
           </div>
 
-       <div>
-  <p className="section-label">Fan Hot Takes</p>
-  {redditLoading ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="card">
-          <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
-          <div className="skeleton" style={{ width: "100%", height: 60 }} />
-        </div>
-      ))}
-    </div>
-  ) : redditPosts.length === 0 ? (
-    <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-        No recent posts found.
-      </p>
-    </div>
-  ) : (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {redditPosts.map((post, i) => (
-        <RedditEmbed key={i} post={post} />
-      ))}
-    </div>
-  )}
-</div>
+          {/* ── Reddit ── */}
+          <div>
+            <p className="section-label">Fan Hot Takes</p>
+            {redditLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="card">
+                    <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
+                    <div className="skeleton" style={{ width: "100%", height: 60 }} />
+                  </div>
+                ))}
+              </div>
+            ) : redditPosts.length === 0 ? (
+              <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+                <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>No recent posts found.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {redditPosts.map((post, i) => (
+                  <RedditEmbed key={i} post={post} />
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </>
