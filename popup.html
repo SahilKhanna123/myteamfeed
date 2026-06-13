@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyTeamFeed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 280px;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #fafafa;
+      color: #18181b;
+    }
+
+    .header {
+      background: #18181b;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .header-sub {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 1px;
+    }
+
+    .section {
+      padding: 14px 16px;
+    }
+
+    .section-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #a1a1aa;
+      margin-bottom: 8px;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .team-btn {
+      background: #fff;
+      border: 1.5px solid #e4e4e7;
+      border-radius: 8px;
+      padding: 6px 4px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 8px;
+      font-weight: 600;
+      color: #71717a;
+      letter-spacing: 0.04em;
+    }
+
+    .team-btn:hover {
+      border-color: var(--team-color, #18181b);
+      background: color-mix(in srgb, var(--team-color, #18181b) 6%, white);
+    }
+
+    .team-btn.selected {
+      border-color: var(--team-color, #18181b);
+      background: color-mix(in srgb, var(--team-color, #18181b) 10%, white);
+      color: var(--team-color, #18181b);
+    }
+
+    .team-abbr { font-size: 8px; font-weight: 700; }
+
+    .divider { height: 1px; background: #e4e4e7; margin: 0 16px; }
+
+    .current-team {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .current-color-bar {
+      width: 4px;
+      height: 36px;
+      border-radius: 2px;
+      background: var(--team-color, #e4e4e7);
+      flex-shrink: 0;
+    }
+
+    .current-name {
+      font-family: 'Oswald', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181b;
+    }
+
+    .current-sub {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: #a1a1aa;
+      margin-top: 2px;
+    }
+
+    .actions {
+      padding: 10px 16px 16px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--selected-color, #18181b);
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #f4f4f5;
+      color: #71717a;
+    }
+
+    .no-team {
+      padding: 20px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    .no-team strong {
+      display: block;
+      font-family: 'Oswald', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181b;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">⚾ MyTeamFeed</div>
+      <div class="header-sub">Live score widget</div>
+    </div>
+  </div>
+
+  <div id="team-picker">
+    <div class="section">
+      <div class="section-label">Choose your team</div>
+      <div class="team-grid" id="team-grid"></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div id="selected-display" style="display:none">
+    <div class="current-team" id="current-team-display"></div>
+    <div class="divider"></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-save">Show widget</button>
+    <button class="btn btn-secondary" id="btn-hide">Hide widget</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

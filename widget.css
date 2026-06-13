@@ -1,0 +1,526 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
+
+#mtf-widget {
+  --mtf-color: #18181b;
+  --mtf-bg: #ffffff;
+  --mtf-border: #e4e4e7;
+  --mtf-text: #18181b;
+  --mtf-muted: #71717a;
+  --mtf-faint: rgba(0,0,0,0.04);
+  --mtf-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+  --mtf-radius: 16px;
+
+  all: initial;
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 20px !important;
+  z-index: 2147483647 !important;
+  width: 260px !important;
+  /* No height — let content size it, but cap it */
+  max-height: 520px !important;
+  background: var(--mtf-bg) !important;
+  border: 1.5px solid var(--mtf-border) !important;
+  border-radius: var(--mtf-radius) !important;
+  box-shadow: var(--mtf-shadow) !important;
+  font-family: 'DM Sans', system-ui, sans-serif !important;
+  overflow: hidden !important;
+  transition: box-shadow 0.2s, transform 0.15s !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#mtf-widget.mtf-flash {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 3px var(--mtf-color) !important;
+  animation: mtf-pulse 0.7s ease-out !important;
+}
+
+@keyframes mtf-pulse {
+  0%   { transform: scale(1.03); }
+  60%  { transform: scale(0.99); }
+  100% { transform: scale(1); }
+}
+
+/* ── Header ── */
+#mtf-widget .mtf-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 11px 14px 10px !important;
+  background: var(--mtf-color) !important;
+  cursor: grab !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-header:active { cursor: grabbing !important; }
+
+#mtf-widget .mtf-header-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+}
+
+#mtf-widget .mtf-team-name {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+}
+
+#mtf-widget .mtf-header-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-icon-btn {
+  all: unset !important;
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  font-size: 16px !important;
+  color: rgba(255,255,255,0.7) !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+  line-height: 1 !important;
+}
+
+#mtf-widget .mtf-icon-btn:hover {
+  background: rgba(255,255,255,0.15) !important;
+  color: #fff !important;
+}
+
+/* ── Status pills ── */
+#mtf-widget .mtf-pill {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  padding: 2px 7px !important;
+  border-radius: 100px !important;
+  white-space: nowrap !important;
+}
+
+#mtf-widget .mtf-pill--live  { background: rgba(255,255,255,0.2) !important; color: #fff !important; }
+#mtf-widget .mtf-pill--final { background: rgba(0,0,0,0.15) !important; color: rgba(255,255,255,0.8) !important; }
+#mtf-widget .mtf-pill--sched { background: rgba(255,255,255,0.15) !important; color: rgba(255,255,255,0.8) !important; }
+
+#mtf-widget .mtf-result {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 2px 7px !important;
+  border-radius: 100px !important;
+}
+#mtf-widget .mtf-result--w { background: rgba(255,255,255,0.2) !important; color: #86efac !important; }
+#mtf-widget .mtf-result--l { background: rgba(0,0,0,0.2) !important; color: #fca5a5 !important; }
+
+/* ── Body ── */
+#mtf-widget .mtf-body {
+  padding: 14px 16px 10px !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-no-game {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 12px !important;
+  color: var(--mtf-muted) !important;
+  text-align: center !important;
+  padding: 12px 0 !important;
+}
+
+/* ── Score row with logos ── */
+#mtf-widget .mtf-scoreline {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  margin-bottom: 10px !important;
+}
+
+#mtf-widget .mtf-team-col {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex: 1 !important;
+}
+
+#mtf-widget .mtf-logo {
+  width: 40px !important;
+  height: 40px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+#mtf-widget .mtf-logo-fallback {
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--mtf-muted) !important;
+  background: var(--mtf-faint) !important;
+  border-radius: 50% !important;
+}
+
+#mtf-widget .mtf-score {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 34px !important;
+  font-weight: 700 !important;
+  color: var(--mtf-text) !important;
+  line-height: 1 !important;
+}
+
+#mtf-widget .mtf-score--dim { color: #d4d4d8 !important; }
+
+#mtf-widget .mtf-sep {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 300 !important;
+  color: var(--mtf-border) !important;
+  padding: 0 10px !important;
+  padding-top: 14px !important;
+}
+
+/* ── Live section ── */
+#mtf-widget .mtf-live-section {
+  border-top: 1px solid var(--mtf-border) !important;
+  padding-top: 10px !important;
+  margin-top: 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+#mtf-widget .mtf-live-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+#mtf-widget .mtf-diamond {
+  width: 40px !important;
+  height: 40px !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-count {
+  display: flex !important;
+  gap: 8px !important;
+  flex: 1 !important;
+  justify-content: flex-end !important;
+}
+
+#mtf-widget .mtf-count-group {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+#mtf-widget .mtf-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  display: block !important;
+  transition: background 0.2s !important;
+}
+
+#mtf-widget .mtf-count-lbl {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.1em !important;
+  color: #a1a1aa !important;
+  text-transform: uppercase !important;
+}
+
+/* ── Pitcher / Batter ── */
+#mtf-widget .mtf-matchup {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  border-top: 1px solid var(--mtf-border) !important;
+  padding-top: 8px !important;
+}
+
+#mtf-widget .mtf-matchup-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+}
+
+#mtf-widget .mtf-matchup-label {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #a1a1aa !important;
+  flex-shrink: 0 !important;
+  width: 44px !important;
+}
+
+#mtf-widget .mtf-matchup-name {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--mtf-text) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+  text-align: right !important;
+}
+
+#mtf-widget .mtf-matchup-stat {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10px !important;
+  color: var(--mtf-muted) !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-last-play {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11px !important;
+  color: var(--mtf-muted) !important;
+  line-height: 1.5 !important;
+  border-top: 1px solid var(--mtf-border) !important;
+  padding-top: 8px !important;
+}
+
+#mtf-widget .mtf-last-play-label {
+  font-weight: 600 !important;
+  font-size: 9px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #a1a1aa !important;
+  margin-right: 4px !important;
+}
+
+#mtf-widget .mtf-game-date {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10px !important;
+  color: #a1a1aa !important;
+  text-align: center !important;
+  margin-top: 8px !important;
+}
+
+/* ── Starting lineups ── */
+#mtf-widget .mtf-lineups {
+  border-top: 1px solid var(--mtf-border) !important;
+  margin-top: 2px !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+  flex-shrink: 1 !important;
+}
+
+#mtf-widget .mtf-lineups::-webkit-scrollbar { width: 4px !important; }
+#mtf-widget .mtf-lineups::-webkit-scrollbar-thumb { background: var(--mtf-border) !important; border-radius: 4px !important; }
+
+#mtf-widget .mtf-lineup-header {
+  display: flex !important;
+  gap: 0 !important;
+  background: var(--mtf-faint) !important;
+  border-bottom: 1px solid var(--mtf-border) !important;
+}
+
+#mtf-widget .mtf-lineup-col {
+  flex: 1 !important;
+  padding: 6px 8px !important;
+}
+
+#mtf-widget .mtf-lineup-col + .mtf-lineup-col {
+  border-left: 1px solid var(--mtf-border) !important;
+}
+
+#mtf-widget .mtf-lineup-team {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--mtf-muted) !important;
+}
+
+#mtf-widget .mtf-lineup-rows {
+  display: flex !important;
+  gap: 0 !important;
+}
+
+#mtf-widget .mtf-lineup-side {
+  flex: 1 !important;
+  padding: 4px 8px !important;
+}
+
+#mtf-widget .mtf-lineup-side + .mtf-lineup-side {
+  border-left: 1px solid var(--mtf-border) !important;
+}
+
+#mtf-widget .mtf-lineup-player {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 4px !important;
+  padding: 2px 0 !important;
+}
+
+#mtf-widget .mtf-lineup-num {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 9px !important;
+  color: #a1a1aa !important;
+  width: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-lineup-pname {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10px !important;
+  color: var(--mtf-text) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#mtf-widget .mtf-lineup-pos {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 9px !important;
+  color: var(--mtf-muted) !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-no-lineup {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10px !important;
+  color: var(--mtf-muted) !important;
+  text-align: center !important;
+  padding: 8px !important;
+  font-style: italic !important;
+}
+
+/* ── Footer ── */
+#mtf-widget .mtf-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 16px 12px !important;
+  border-top: 1px solid var(--mtf-border) !important;
+  flex-shrink: 0 !important;
+}
+
+#mtf-widget .mtf-updated {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 9px !important;
+  color: #a1a1aa !important;
+  letter-spacing: 0.04em !important;
+}
+
+#mtf-widget .mtf-refresh-btn {
+  all: unset !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--mtf-color) !important;
+  cursor: pointer !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  transition: background 0.15s !important;
+}
+
+#mtf-widget .mtf-refresh-btn:hover {
+  background: var(--mtf-faint) !important;
+}
+
+/* ── Minimized state ── */
+#mtf-widget .mtf-mini {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 10px 12px !important;
+  cursor: grab !important;
+  background: var(--mtf-color) !important;
+  gap: 8px !important;
+}
+
+#mtf-widget .mtf-mini:active { cursor: grabbing !important; }
+
+#mtf-widget .mtf-mini-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+#mtf-widget .mtf-mini-abbr {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+  letter-spacing: 0.05em !important;
+}
+
+#mtf-widget .mtf-mini-score {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 11px !important;
+  color: rgba(255,255,255,0.8) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 160px !important;
+}
+
+#mtf-widget .mtf-live-dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #ef4444 !important;
+  flex-shrink: 0 !important;
+  animation: mtf-blink 1.2s infinite !important;
+}
+
+@keyframes mtf-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+#mtf-widget .mtf-expand-btn {
+  all: unset !important;
+  font-size: 11px !important;
+  color: rgba(255,255,255,0.6) !important;
+  cursor: pointer !important;
+  padding: 2px 5px !important;
+  border-radius: 5px !important;
+  flex-shrink: 0 !important;
+  transition: color 0.15s !important;
+}
+
+#mtf-widget .mtf-expand-btn:hover { color: #fff !important; }
+
+/* ── Game time (pre-game) ── */
+#mtf-widget .mtf-gametime {
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--mtf-text) !important;
+  text-align: center !important;
+  margin: 4px 0 8px !important;
+}
