@@ -539,3 +539,7 @@ min-height: 0 !important;         /* ADD THIS */
   max-width: fit-content !important; 
   overflow: hidden !important;
 }
+
+#mtf-widget .mtf-logo-fallback {
+  display: none !important;
+}

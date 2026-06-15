@@ -49,8 +49,10 @@
   }
 
   function logoUrl(espnTeamId) {
-    return `https://a.espncdn.com/i/teamlogos/mlb/500/scoreboard/${espnTeamId}.png`;
-  }
+  const team = MLB_TEAMS.find(t => t.espnId === espnTeamId);
+  if (!team) return "";
+  return chrome.runtime.getURL(`logos/mlb/${team.abbreviation.toLowerCase()}.png`);
+}
 
   function logoImg(teamId, abbr) {
     return `<img class="mtf-logo" src="${logoUrl(teamId)}" alt="${abbr}"
