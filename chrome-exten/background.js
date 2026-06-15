@@ -36,6 +36,7 @@ const MLB_TEAMS = [
 
 async function fetchScore(teamId) {
   try {
+    // Step 1 — check today's scoreboard
     const res = await fetch(
       "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
     );
@@ -48,56 +49,62 @@ async function fetchScore(teamId) {
       )
     );
 
-    if (!event) {
-      // No game today — get last result
-      const schedRes = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}/schedule`
-      );
-      const schedJson = await schedRes.json();
-      const completed = (schedJson.events ?? [])
-        .filter((ev) => ev.competitions?.[0]?.status?.type?.state === "post")
-        .sort((a, b) =>
-          new Date(b.competitions[0].date) - new Date(a.competitions[0].date)
-        );
+    if (event) {
+      const comp = event.competitions[0];
+      const gameId = event.id;
+      const state = comp.status?.type?.state ?? "pre";
+      const parsed = parseGame(comp, teamId, true);
 
-      if (completed.length > 0) {
-        return parseGame(completed[0].competitions[0], teamId, false);
+      if (state === "pre") {
+        try {
+          const summaryRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${gameId}`
+          );
+          const summary = await summaryRes.json();
+          parsed.awayLineup = extractLineup(summary, "away");
+          parsed.homeLineup = extractLineup(summary, "home");
+        } catch (_) {}
       }
-      return null;
+
+      if (state === "in") {
+        try {
+          const summaryRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${gameId}`
+          );
+          const summary = await summaryRes.json();
+          const pitcherBatter = extractPitcherBatter(summary);
+          parsed.pitcher = pitcherBatter.pitcher;
+          parsed.batter = pitcherBatter.batter;
+        } catch (_) {}
+      }
+
+      return parsed;
     }
 
-    const comp = event.competitions[0];
-    const gameId = event.id;
-    const state = comp.status?.type?.state ?? "pre";
+    // Step 2 — no game today, walk back up to 7 days using scoreboard?dates=
+    for (let daysBack = 1; daysBack <= 7; daysBack++) {
+      const d = new Date();
+      d.setDate(d.getDate() - daysBack);
+      const dateStr = d.toISOString().slice(0, 10).replace(/-/g, ""); // "20260614"
 
-    const parsed = parseGame(comp, teamId, true);
+      const pastRes = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${dateStr}`
+      );
+      const pastJson = await pastRes.json();
+      const pastEvents = pastJson.events ?? [];
 
-    // For pre-game, try to fetch lineups
-    if (state === "pre") {
-      try {
-        const summaryRes = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${gameId}`
-        );
-        const summary = await summaryRes.json();
-        parsed.awayLineup = extractLineup(summary, "away");
-        parsed.homeLineup = extractLineup(summary, "home");
-      } catch (_) {}
+      const pastGame = pastEvents.find((ev) =>
+        ev.competitions?.[0]?.competitors?.some(
+          (c) => c.id === teamId || c.team?.id === teamId
+        )
+      );
+
+      if (pastGame) {
+        return parseGame(pastGame.competitions[0], teamId, false);
+      }
     }
 
-    // For live games, fetch pitcher/batter from summary
-    if (state === "in") {
-      try {
-        const summaryRes = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${gameId}`
-        );
-        const summary = await summaryRes.json();
-        const pitcherBatter = extractPitcherBatter(summary);
-        parsed.pitcher = pitcherBatter.pitcher;
-        parsed.batter = pitcherBatter.batter;
-      } catch (_) {}
-    }
-
-    return parsed;
+    return null;
   } catch (e) {
     console.error("Score fetch failed:", e);
     return null;
