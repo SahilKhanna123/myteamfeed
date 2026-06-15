@@ -179,76 +179,62 @@ function useGameData(teamId: string) {
           return;
         }
 
-        // Step 2 — no game today, fetch team schedule and find last completed game
-        const scheduleRes = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}/schedule`
+        // Step 2 — use the team endpoint to get last event
+        const teamRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}?enable=roster,projection,stats`
         );
-        const scheduleJson = await scheduleRes.json();
-        const events: any[] = scheduleJson.events ?? [];
+        const teamJson = await teamRes.json();
 
-        const completed = events
-          .filter((ev) => ev.competitions?.[0]?.status?.type?.state === "post")
-          .sort((a, b) =>
-            new Date(b.competitions[0].date).getTime() -
-            new Date(a.competitions[0].date).getTime()
+        // nextEvent gives the next scheduled game — we want the previous one
+        // Use the scoreboard with a date param instead: fetch yesterday's scoreboard
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const dateStr = yesterday.toISOString().slice(0, 10).replace(/-/g, "");
+
+        const yestRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${dateStr}`
+        );
+        const yestJson = await yestRes.json();
+        const yestEvents: any[] = yestJson.events ?? [];
+
+        const yestGame = yestEvents.find((ev) =>
+          ev.competitions?.[0]?.competitors?.some(
+            (c: any) => c.id === teamId || c.team?.id === teamId
+          )
+        );
+
+        if (yestGame) {
+          setGameData(parseCompetition(yestGame.competitions[0], teamId, false));
+          setLoading(false);
+          return;
+        }
+
+        // Step 3 — walk back up to 7 days to find last completed game
+        for (let daysBack = 2; daysBack <= 7; daysBack++) {
+          const d = new Date();
+          d.setDate(d.getDate() - daysBack);
+          const ds = d.toISOString().slice(0, 10).replace(/-/g, "");
+
+          const res = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${ds}`
+          );
+          const json = await res.json();
+          const events: any[] = json.events ?? [];
+
+          const game = events.find((ev) =>
+            ev.competitions?.[0]?.competitors?.some(
+              (c: any) => c.id === teamId || c.team?.id === teamId
+            )
           );
 
-        if (completed.length > 0) {
-          const comp = completed[0].competitions[0];
-
-          // ── The schedule endpoint puts scores differently ──
-          // competitors[].score is a string like "5", but sometimes missing
-          // so we parse it safely here instead of in parseCompetition
-          const home = comp.competitors.find((c: any) => c.homeAway === "home");
-          const away = comp.competitors.find((c: any) => c.homeAway === "away");
-
-          const homeScore = home?.score !== undefined && home?.score !== ""
-            ? parseInt(home.score, 10)
-            : null;
-          const awayScore = away?.score !== undefined && away?.score !== ""
-            ? parseInt(away.score, 10)
-            : null;
-
-          // If scores are still NaN, try linescores sum as fallback
-          const homeScoreFinal = (!isNaN(homeScore as number) && homeScore !== null)
-            ? homeScore
-            : (home?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
-          const awayScoreFinal = (!isNaN(awayScore as number) && awayScore !== null)
-            ? awayScore
-            : (away?.linescores ?? []).reduce((sum: number, ls: any) => sum + (ls.value ?? 0), 0);
-
-          const statusState = comp.status?.type?.state ?? "post";
-          const rawDate = comp.date ?? "";
-          const dateStr = rawDate
-            ? new Date(rawDate).toLocaleDateString("en-US", {
-                month: "short", day: "numeric", year: "numeric",
-              })
-            : "TBD";
-
-          const pageTeamIsHome = home?.id === teamId || home?.team?.id === teamId;
-          const pageTeamScore = pageTeamIsHome ? homeScoreFinal : awayScoreFinal;
-          const opponentScore = pageTeamIsHome ? awayScoreFinal : homeScoreFinal;
-          const result: "W" | "L" = pageTeamScore > opponentScore ? "W" : "L";
-
-          setGameData({
-            status: "Final",
-            inning: null,
-            homeTeam: {
-              abbreviation: home?.team?.abbreviation ?? "???",
-              score: homeScoreFinal,
-            },
-            awayTeam: {
-              abbreviation: away?.team?.abbreviation ?? "???",
-              score: awayScoreFinal,
-            },
-            date: dateStr,
-            venue: comp.venue?.fullName ?? "TBD",
-            result,
-            isToday: false,
-          });
-        } else {
-          setGameData(null);
+          if (game) {
+            setGameData(parseCompetition(game.competitions[0], teamId, false));
+            setLoading(false);
+            return;
+          }
         }
+
+        setGameData(null);
       } catch (err) {
         console.error("Failed to load game data", err);
         setGameData(null);
