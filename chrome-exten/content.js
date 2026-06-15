@@ -49,8 +49,10 @@
   }
 
   function logoUrl(espnTeamId) {
-    return `https://a.espncdn.com/i/teamlogos/mlb/500/scoreboard/${espnTeamId}.png`;
-  }
+  const team = MLB_TEAMS.find(t => t.espnId === espnTeamId);
+  if (!team) return "";
+  return chrome.runtime.getURL(`logos/mlb/${team.abbreviation.toLowerCase()}.png`);
+}
 
   function logoImg(teamId, abbr) {
     return `<img class="mtf-logo" src="${logoUrl(teamId)}" alt="${abbr}"
@@ -170,27 +172,38 @@
     widget.style.setProperty("--mtf-color", team?.color ?? "#18181b");
 
     if (isMinimized) {
-      widget.innerHTML = `
-        <div class="mtf-mini" id="mtf-mini">
-          <div class="mtf-mini-inner">
-            <span class="mtf-mini-abbr">${team?.abbreviation ?? "MLB"}</span>
-            ${score ? `
-              <span class="mtf-mini-score">
-                ${score.awayTeam.abbreviation} ${score.awayTeam.score ?? "–"} · ${score.homeTeam.abbreviation} ${score.homeTeam.score ?? "–"}
-              </span>
-              ${score.status === "Live" ? `<span class="mtf-live-dot"></span>` : ""}
-            ` : `<span class="mtf-mini-score">No game</span>`}
-          </div>
-          <button class="mtf-expand-btn" id="mtf-expand" title="Expand">▲</button>
-        </div>`;
-      document.getElementById("mtf-expand")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        isMinimized = false;
-        renderWidget(currentScore, currentTeam);
-      });
-      document.getElementById("mtf-mini")?.addEventListener("mousedown", startDrag);
-      return;
-    }
+  // Force widget to shrink to pill — no body, no footer, no leftover space
+widget.classList.add("mtf-is-minimized");
+
+  const scoreText = score
+    ? `${score.awayTeam.abbreviation} ${score.awayTeam.score ?? "–"} · ${score.homeTeam.abbreviation} ${score.homeTeam.score ?? "–"}`
+    : "No game";
+  const liveDot = score?.status === "Live" ? `<span class="mtf-live-dot"></span>` : "";
+
+  widget.innerHTML = `
+    <div class="mtf-mini" id="mtf-mini">
+      <span class="mtf-mini-abbr">${team?.abbreviation ?? "MLB"}</span>
+      <span class="mtf-mini-divider"></span>
+      <span class="mtf-mini-score">${scoreText}</span>
+      ${liveDot}
+      <button class="mtf-expand-btn" id="mtf-expand" title="Expand">▲</button>
+    </div>`;
+
+  document.getElementById("mtf-expand")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    isMinimized = false;
+    widget.classList.remove("mtf-is-minimized");
+    widget.style.width = "260px";
+    widget.style.height = "";
+    widget.style.maxHeight = "";
+    widget.style.borderRadius = "";
+      widget.style.display = "";       // ADD THIS — resets back to CSS flex
+  widget.style.minHeight = ""; 
+    renderWidget(currentScore, currentTeam);
+  });
+  document.getElementById("mtf-mini")?.addEventListener("mousedown", startDrag);
+  return;
+}
 
     const noGame = !score;
 
@@ -307,8 +320,7 @@
     dragOffsetX = e.clientX - rect.left;
     dragOffsetY = e.clientY - rect.top;
     // Lock the size before dragging so it can't stretch
-    widget.style.width = widget.offsetWidth + "px";
-    widget.style.height = widget.offsetHeight + "px";
+    
     widget.style.transition = "none";
     document.addEventListener("mousemove", onDrag);
     document.addEventListener("mouseup", stopDrag);
@@ -329,7 +341,7 @@
   function stopDrag() {
     isDragging = false;
     // Release the locked height so content can resize naturally again
-    widget.style.height = "";
+     if (!isMinimized) widget.style.height = "";
     widget.style.transition = "";
     document.removeEventListener("mousemove", onDrag);
     document.removeEventListener("mouseup", stopDrag);

@@ -27,7 +27,8 @@
   transition: box-shadow 0.2s, transform 0.15s !important;
   user-select: none !important;
   box-sizing: border-box !important;
-  display: flex !important;
+  display: inline-flex !important;  /* change from flex to inline-flex */
+min-height: 0 !important;         /* ADD THIS */
   flex-direction: column !important;
 }
 
@@ -451,23 +452,25 @@
 }
 
 /* ── Minimized state ── */
+/* ── Minimized state — pill only, zero extra space ── */
 #mtf-widget .mtf-mini {
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  padding: 10px 12px !important;
+  gap: 8px !important;
+  padding: 7px 14px !important;
   cursor: grab !important;
   background: var(--mtf-color) !important;
-  gap: 8px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
 }
 
 #mtf-widget .mtf-mini:active { cursor: grabbing !important; }
 
-#mtf-widget .mtf-mini-inner {
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  min-width: 0 !important;
+#mtf-widget .mtf-mini-divider {
+  width: 1px !important;
+  height: 12px !important;
+  background: rgba(255,255,255,0.25) !important;
+  flex-shrink: 0 !important;
 }
 
 #mtf-widget .mtf-mini-abbr {
@@ -523,4 +526,20 @@
   color: var(--mtf-text) !important;
   text-align: center !important;
   margin: 4px 0 8px !important;
+}
+
+#mtf-widget.mtf-is-minimized {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: fit-content !important;
+  border-radius: 100px !important;
+  max-width: fit-content !important; 
+  overflow: hidden !important;
+}
+
+#mtf-widget .mtf-logo-fallback {
+  display: none !important;
 }
