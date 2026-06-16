@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
 
   if (code) {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
         }
       }
     )
+
     await supabase.auth.exchangeCodeForSession(code)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
         .single()
 
       if (data?.team_id) {
-        return NextResponse.redirect(new URL(`/mlb/${data.team_id}`, request.url))
+        return NextResponse.redirect(new URL(`/team/${data.team_id}`, request.url))
       }
     }
   }
