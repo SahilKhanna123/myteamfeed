@@ -1,4 +1,6 @@
 "use client";
+import { useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -46,7 +48,7 @@ function TeamBubble({
   onClick,
 }: {
   team: (typeof MLB_TEAMS)[number];
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -130,6 +132,21 @@ function TeamBubble({
 export default function TeamSelectorPage() {
   const router = useRouter();
   const [activeLeague, setActiveLeague] = useState<"ALL" | "AL" | "NL">("ALL");
+  useEffect(() => {
+  async function checkExistingTeam() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('user_team')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .single()
+    if (data?.team_id) {
+      router.push(`/team/${data.team_id}`)
+    }
+  }
+  checkExistingTeam()
+}, [])
 
   const filteredDivisions = DIVISIONS.filter((div) =>
     activeLeague === "ALL" ? true : div.startsWith(activeLeague)
@@ -297,7 +314,16 @@ export default function TeamSelectorPage() {
                     <div key={team.espnId} className="team-slot">
                       <TeamBubble
                         team={team}
-                        onClick={() => router.push(`/team/${team.espnId}`)}
+                        onClick={async () => {
+                              const { data: { user } } = await supabase.auth.getUser()
+                              if (user) {
+                                await supabase.from('user_team').upsert({
+                                  user_id: user.id,
+                                  team_id: team.espnId
+                                })
+                              }
+                              router.push(`/team/${team.espnId}`)
+                            }}
                       />
                     </div>
                   ))}
