@@ -1,5 +1,5 @@
 "use client";
-
+import { supabase } from '@/lib/supabase'
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -46,7 +46,7 @@ function TeamBubble({
   onClick,
 }: {
   team: (typeof MLB_TEAMS)[number];
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -297,7 +297,16 @@ export default function TeamSelectorPage() {
                     <div key={team.espnId} className="team-slot">
                       <TeamBubble
                         team={team}
-                        onClick={() => router.push(`/team/${team.espnId}`)}
+                        onClick={async () => {
+                              const { data: { user } } = await supabase.auth.getUser()
+                              if (user) {
+                                await supabase.from('user_team').upsert({
+                                  user_id: user.id,
+                                  team_id: team.espnId
+                                })
+                              }
+                              router.push(`/team/${team.espnId}`)
+                            }}
                       />
                     </div>
                   ))}
