@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-
+import { supabase } from '@/lib/supabase'
 
 // ─── Team data ───────────────────────────────────────────────────────────────
 const MLB_TEAMS = [
@@ -902,11 +902,37 @@ export default function TeamFeedPage() {
         {/* ── Hero ── */}
         <div className="hero">
           <div className="hero-inner">
-            <button className="back-btn" onClick={() => router.push("/mlb")}>
-              ← All Teams
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <button className="back-btn" onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                  await supabase.from('user_team').delete().eq('user_id', user.id)
+                }
+                router.push('/mlb')
+              }}>
+                ⭐ Change Team
+              </button>
+
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  router.push('/login')
+                }}
+                style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 12,
+                  color: '#a1a1aa',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Sign out
+              </button>
+            </div>
             <div className="team-identity">
-              <div className="team-logo-circle">
+                <div className="team-logo-circle">
                 <Image
                   src={`/logos/mlb/${team.abbreviation.toLowerCase()}.png`}
                   alt={team.name}
@@ -921,7 +947,6 @@ export default function TeamFeedPage() {
             </div>
           </div>
         </div>
-
         {/* ── Feed ── */}
         <div className="feed">
 

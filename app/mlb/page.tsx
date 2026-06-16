@@ -1,5 +1,7 @@
 "use client";
+import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -130,6 +132,21 @@ function TeamBubble({
 export default function TeamSelectorPage() {
   const router = useRouter();
   const [activeLeague, setActiveLeague] = useState<"ALL" | "AL" | "NL">("ALL");
+  useEffect(() => {
+  async function checkExistingTeam() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('user_team')
+      .select('team_id')
+      .eq('user_id', user.id)
+      .single()
+    if (data?.team_id) {
+      router.push(`/team/${data.team_id}`)
+    }
+  }
+  checkExistingTeam()
+}, [])
 
   const filteredDivisions = DIVISIONS.filter((div) =>
     activeLeague === "ALL" ? true : div.startsWith(activeLeague)
