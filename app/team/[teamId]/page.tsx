@@ -424,7 +424,32 @@ function BaseDiamond({ bases }: { bases: { first: boolean; second: boolean; thir
     </svg>
   );
 }
+function useFact(teamId: string, teamName: string) {
+  const [fact, setFact] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/fact?teamId=${teamId}&teamName=${encodeURIComponent(teamName)}`
+        );
+
+        const json = await res.json();
+
+        setFact(json.fact_text);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [teamId, teamName]);
+
+  return { fact, loading };
+}
 function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) {
   const { liveData, loading } = useLiveGameData(teamId, isLive);
 
@@ -641,7 +666,8 @@ export default function TeamFeedPage() {
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
-   const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
+  const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
+ const { fact, loading: factLoading } = useFact(teamId, team ? `${team.city} ${team.name}` : "");  
 
   if (!team) {
     return (
@@ -1107,7 +1133,14 @@ export default function TeamFeedPage() {
             <p className="section-label">Did You Know</p>
             <div className="fact-card">
               <div className="fact-eyebrow">⚡ Interesting Fact</div>
-              <p className="fact-text">{MOCK_FACT.text}</p>
+              {factLoading ? (
+  <div
+    className="skeleton"
+    style={{ width: "100%", height: 50 }}
+  />
+) : (
+  <p className="fact-text">{fact}</p>
+)}
             </div>
           </div>
 
