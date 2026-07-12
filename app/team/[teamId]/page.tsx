@@ -53,27 +53,12 @@ interface GameData {
   isToday: boolean;
 }
 
-// ─── Mock data (stat / articles / fact / reddit unchanged) ────────────────────
-const MOCK_STAT = {
-  label: "Team ERA",
-  value: "3.41",
-  context: "3rd best in the AL",
-};
 
 
 
-const MOCK_FACT = {
-  text: "Fenway Park's Green Monster is 37 feet 2 inches tall — originally built that height to block the view of non-paying fans watching from a hill outside the park.",
-};
 
-const MOCK_REDDIT = {
-  author: "u/FenwayFaithful_92",
-  subreddit: "r/redsox",
-  upvotes: "2.4k",
-  text: "I don't care what anyone says, this bullpen is actually built different this year. Three games in and I already trust them more than any Red Sox pen since 2018. Don't @ me.",
-  url: "https://reddit.com/r/redsox",
-  time: "4h ago",
-};
+
+
 
 // ─── Helper: parse a competition object into GameData ────────────────────────
 function parseCompetition(
@@ -617,45 +602,299 @@ function LiveGamePanel({ teamId, isLive }: { teamId: string; isLive: boolean }) 
 
     </div>
   );
-}// ─── Reddit ───────────────────────────────────────────────────────────────────
-const TEAM_SUBREDDITS: Record<string, string> = {
-  "2":  "redsox",       "10": "NYYankees",        "14": "Torontobluejays",
-  "1":  "orioles",      "30": "TampaBayRays",      "5":  "ClevelandGuardians",
-  "7":  "KCRoyals",     "9":  "minnesotatwins",    "6":  "motorcitykitties",
-  "4":  "whitesox",     "13": "TexasRangers",      "18": "Astros",
-  "12": "Mariners",     "3":  "angelsbaseball",    "11": "OaklandAthletics",
-  "15": "Braves",       "22": "phillies",          "21": "NewYorkMets",
-  "20": "Nationals",    "28": "letsgofish",        "8":  "BrewersZone",
-  "16": "CHICubs",      "24": "Cardinals",         "17": "Reds",
-  "23": "buccos",       "19": "Dodgers",           "29": "azdiamondbacks",
-  "26": "SFGiants",     "27": "ColoradoRockies",   "25": "Padres",
-};
-
-interface RedditPost {
-  author: string;
-  subreddit: string;
-  upvotes: string;
-  text: string;
-  url: string;
-  time: string;
 }
 
-function useRedditPost(teamId: string) {
-  const [post, setPost] = useState<RedditPost | null>(null);
+// ─── Hot Takes ─────────────────────────────────────────────────────────────
+interface HotTakeReply {
+  id: string;
+  author_name: string;
+  text: string;
+  created_at: string;
+  user_id: string;
+}
+
+interface HotTake {
+  id: string;
+  author_name: string;
+  text: string;
+  likes: number;
+  created_at: string;
+  user_id: string;
+  liked_by_me: boolean;
+  replies: HotTakeReply[];
+}
+
+function useHotTakes(teamId: string) {
+  const [hotTakes, setHotTakes] = useState<HotTake[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subreddit = TEAM_SUBREDDITS[teamId];
-    if (!subreddit) { setLoading(false); return; }
+  async function load() {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
 
-    fetch(`/api/reddit?subreddit=${subreddit}`)
-      .then((r) => r.json())
-      .then((data) => setPost(data.post ?? null))
-      .catch(() => setPost(null))
-      .finally(() => setLoading(false));
-  }, [teamId]);
+      const { data: takes, error } = await supabase
+        .from("hot_takes")
+        .select("*")
+        .eq("team_id", teamId)
+        .order("created_at", { ascending: false });
 
-  return { post, loading };
+      if (error) throw error;
+
+      const takeIds = (takes ?? []).map((t) => t.id);
+
+      const [{ data: replies }, { data: myLikes }] = await Promise.all([
+        takeIds.length
+          ? supabase.from("hot_take_replies").select("*").in("hot_take_id", takeIds).order("created_at", { ascending: true })
+          : Promise.resolve({ data: [] as any[] }),
+        user && takeIds.length
+          ? supabase.from("hot_take_likes").select("hot_take_id").eq("user_id", user.id).in("hot_take_id", takeIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const likedIds = new Set((myLikes ?? []).map((l: any) => l.hot_take_id));
+
+      const merged: HotTake[] = (takes ?? []).map((t: any) => ({
+        ...t,
+        liked_by_me: likedIds.has(t.id),
+        replies: (replies ?? []).filter((r: any) => r.hot_take_id === t.id),
+      }));
+
+      setHotTakes(merged);
+    } catch (e) {
+      console.error("Failed to load hot takes", e);
+      setHotTakes([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [teamId]);
+
+  async function postTake(text: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const name = user.user_metadata?.display_name || user.email?.split("@")[0] || "Fan";
+    await supabase.from("hot_takes").insert({
+      team_id: teamId,
+      user_id: user.id,
+      author_name: name,
+      text,
+    });
+    await load();
+  }
+
+  async function toggleLike(take: HotTake) {
+    if (!userId) return;
+    if (take.liked_by_me) {
+      await supabase.from("hot_take_likes").delete().eq("hot_take_id", take.id).eq("user_id", userId);
+    } else {
+      await supabase.from("hot_take_likes").insert({ hot_take_id: take.id, user_id: userId });
+    }
+    setHotTakes((prev) =>
+      prev.map((t) =>
+        t.id === take.id
+          ? { ...t, liked_by_me: !t.liked_by_me, likes: t.likes + (t.liked_by_me ? -1 : 1) }
+          : t
+      )
+    );
+  }
+
+  async function postReply(takeId: string, text: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const name = user.user_metadata?.display_name || user.email?.split("@")[0] || "Fan";
+    await supabase.from("hot_take_replies").insert({
+      hot_take_id: takeId,
+      user_id: user.id,
+      author_name: name,
+      text,
+    });
+    await load();
+  }
+
+  return { hotTakes, loading, postTake, toggleLike, postReply, userId };
+}
+
+function timeAgo(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function HotTakeCard({
+  take, onLike, onReply,
+}: { take: HotTake; onLike: () => void; onReply: (text: string) => void }) {
+  const [showReplies, setShowReplies] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitReply() {
+    if (!replyText.trim()) return;
+    setSubmitting(true);
+    await onReply(replyText.trim());
+    setReplyText("");
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="card">
+      <div className="reddit-top">
+        <span className="reddit-author">{take.author_name}</span>
+        <span className="reddit-ago">{timeAgo(take.created_at)}</span>
+      </div>
+      <p className="reddit-text" style={{ fontStyle: "normal" }}>{take.text}</p>
+      <div className="reddit-footer">
+        <button
+          onClick={onLike}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 500,
+            color: take.liked_by_me ? "var(--color)" : "#a1a1aa",
+          }}
+        >
+          {take.liked_by_me ? "❤️" : "🤍"} {take.likes}
+        </button>
+        <button
+          onClick={() => setShowReplies((s) => !s)}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 500,
+            color: "#a1a1aa",
+          }}
+        >
+          💬 {take.replies.length} {take.replies.length === 1 ? "reply" : "replies"}
+        </button>
+      </div>
+
+      {showReplies && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f4f4f5", display: "flex", flexDirection: "column", gap: 10 }}>
+          {take.replies.map((r) => (
+            <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, color: "var(--color)" }}>
+                  {r.author_name}
+                </span>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "#a1a1aa" }}>
+                  {timeAgo(r.created_at)}
+                </span>
+              </div>
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#3f3f46" }}>{r.text}</p>
+            </div>
+          ))}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <input
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Write a reply…"
+              onKeyDown={(e) => e.key === "Enter" && submitReply()}
+              style={{
+                flex: 1, fontFamily: "'DM Sans', sans-serif", fontSize: 12,
+                padding: "8px 10px", borderRadius: 8, border: "1.5px solid #e4e4e7",
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={submitReply}
+              disabled={submitting || !replyText.trim()}
+              style={{
+                fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600,
+                color: "#fff", background: "var(--color)", border: "none",
+                borderRadius: 8, padding: "0 14px", cursor: "pointer",
+                opacity: submitting || !replyText.trim() ? 0.5 : 1,
+              }}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HotTakesSection({ teamId }: { teamId: string }) {
+  const { hotTakes, loading, postTake, toggleLike, postReply, userId } = useHotTakes(teamId);
+  const [newTake, setNewTake] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  async function submit() {
+    if (!newTake.trim()) return;
+    setPosting(true);
+    await postTake(newTake.trim());
+    setNewTake("");
+    setPosting(false);
+  }
+
+  return (
+    <div>
+      <p className="section-label">Fan Hot Takes</p>
+
+      {userId ? (
+        <div className="card" style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+          <input
+            value={newTake}
+            onChange={(e) => setNewTake(e.target.value)}
+            placeholder="Drop your hot take…"
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            style={{
+              flex: 1, fontFamily: "'DM Sans', sans-serif", fontSize: 13,
+              padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e4e4e7",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={submit}
+            disabled={posting || !newTake.trim()}
+            style={{
+              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600,
+              color: "#fff", background: "var(--color)", border: "none",
+              borderRadius: 10, padding: "0 18px", cursor: "pointer",
+              opacity: posting || !newTake.trim() ? 0.5 : 1,
+            }}
+          >
+            Post
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ marginBottom: 12, textAlign: "center", padding: "16px 20px" }}>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+            Sign in to post a hot take.
+          </p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card">
+          <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
+          <div className="skeleton" style={{ width: "100%", height: 60 }} />
+        </div>
+      ) : hotTakes.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
+          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
+            No hot takes yet — be the first.
+          </p>
+        </div>
+      ) : (
+        <div className="articles-stack">
+          {hotTakes.map((t) => (
+            <HotTakeCard
+              key={t.id}
+              take={t}
+              onLike={() => toggleLike(t)}
+              onReply={(text) => postReply(t.id, text)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -666,7 +905,7 @@ export default function TeamFeedPage() {
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
-  const { post: redditPost, loading: redditLoading } = useRedditPost(teamId);
+  
  const { fact, loading: factLoading } = useFact(teamId, team ? `${team.city} ${team.name}` : "");  
 
   if (!team) {
@@ -1078,18 +1317,6 @@ export default function TeamFeedPage() {
               <LiveGamePanel teamId={teamId} isLive={true} />
             </div>
           )}
-          {/* ── Stat ── */}
-          <div>
-            <p className="section-label">Team Stat</p>
-            <div className="card stat-row">
-              <div className="stat-icon-box">📊</div>
-              <div>
-                <div className="stat-val">{MOCK_STAT.value}</div>
-                <div className="stat-lbl">{MOCK_STAT.label}</div>
-                <div className="stat-ctx">{MOCK_STAT.context}</div>
-              </div>
-            </div>
-          </div>
 
           {/* ── Articles ── */}
           <div>
@@ -1144,38 +1371,8 @@ export default function TeamFeedPage() {
             </div>
           </div>
 
-          <div>
-  <p className="section-label">Fan Hot Take</p>
-  {redditLoading ? (
-    <div className="card">
-      <div className="skeleton" style={{ width: "40%", height: 12, marginBottom: 12 }} />
-      <div className="skeleton" style={{ width: "100%", height: 60 }} />
-    </div>
-  ) : !redditPost ? (
-    <div className="card" style={{ textAlign: "center", padding: "24px 20px" }}>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#a1a1aa" }}>
-        No posts found.
-      </p>
-    </div>
-  ) : (
-    <div className="card">
-      <div className="reddit-top">
-        <span className="reddit-author">{redditPost.author}</span>
-        <div className="reddit-meta-right">
-          <span className="reddit-sub">{redditPost.subreddit}</span>
-          <span className="reddit-upvotes">▲ {redditPost.upvotes}</span>
-        </div>
-      </div>
-      <p className="reddit-text">{redditPost.text}</p>
-      <div className="reddit-footer">
-        <span className="reddit-ago">{redditPost.time}</span>
-        <a className="reddit-link" href={redditPost.url} target="_blank" rel="noreferrer">
-          View thread →
-        </a>
-      </div>
-    </div>
-  )}
-</div>
+          
+  <HotTakesSection teamId={teamId} />
         </div>
       </div>
     </>
