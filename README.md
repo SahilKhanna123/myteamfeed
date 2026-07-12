@@ -4,7 +4,7 @@
 
 A personalized MLB companion app — pick your team once and get a single feed with live scores, breaking news, fun facts, and a community hot-takes board, all themed in your team's colors.
 
-🔗 **Live app:** [your-vercel-url-here](#)
+🔗 **Live app:** [https://myteamfeed-9pzq-one.vercel.app/]
 
 ## Features
 
