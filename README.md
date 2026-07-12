@@ -34,6 +34,12 @@ You'll need a `.env.local` with your own Supabase project keys:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
+## Roadmap
+
+- [ ] NBA, NFL, and NHL support (currently MLB only)
+- [ ] Push notifications for live game updates
+- [ ] User profile / display name settings
+- [ ] Report/moderate hot takes
 
 ## License
 
