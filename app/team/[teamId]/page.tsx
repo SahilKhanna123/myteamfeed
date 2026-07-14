@@ -265,6 +265,60 @@ function useNewsData(teamName: string, teamCity: string) {
  
   return { articles, loading };
 }
+
+// ─── Hook: fetch team record ──────────────────────────────────────────────
+interface TeamRecord {
+  wins: number;
+  losses: number;
+  winPct: string | null;
+}
+
+function useTeamRecord(teamId: string) {
+  const [record, setRecord] = useState<TeamRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!teamId) return;
+
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/teams/${teamId}`
+        );
+        const json = await res.json();
+
+        const items = json.team?.record?.items ?? [];
+        // "total" is the overall season record
+        const overall = items.find((i: any) => i.type === "total") ?? items[0];
+
+        if (overall) {
+          const stats = overall.stats ?? [];
+          const wins = stats.find((s: any) => s.name === "wins")?.value ?? null;
+          const losses = stats.find((s: any) => s.name === "losses")?.value ?? null;
+          const winPct = stats.find((s: any) => s.name === "winPercent")?.value ?? null;
+
+          setRecord({
+            wins: wins != null ? Math.round(wins) : 0,
+            losses: losses != null ? Math.round(losses) : 0,
+            winPct: winPct != null ? winPct.toFixed(3).replace(/^0/, "") : null,
+          });
+        } else {
+          setRecord(null);
+        }
+      } catch (err) {
+        console.error("Failed to load team record", err);
+        setRecord(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [teamId]);
+
+  return { record, loading };
+}
 // ─── Live Game Panel ──────────────────────────────────────────────────────────
 interface LiveData {
   currentPitcher: { name: string; summary: string };
@@ -903,6 +957,7 @@ export default function TeamFeedPage() {
   const router = useRouter();
   const teamId = params.teamId as string;
   const team = MLB_TEAMS.find((t) => t.espnId === teamId);
+  const { record, loading: recordLoading } = useTeamRecord(teamId);
   const { gameData, loading: gameLoading } = useGameData(teamId);
   const { articles, loading: newsLoading } = useNewsData(team?.name ?? "", team?.city ?? "");
   
@@ -1207,7 +1262,12 @@ export default function TeamFeedPage() {
               </div>
               <div>
                 <h1 className="team-name">{team.city} {team.name}</h1>
-                <p className="team-sub">{team.division} · {team.league}</p>
+                  <p className="team-sub">
+                    {team.division} · {team.league}
+                    {!recordLoading && record && (
+                      <> &nbsp;·&nbsp; {record.wins}-{record.losses}{record.winPct ? ` (${record.winPct})` : ""}</>
+                    )}
+                  </p>
               </div>
             </div>
           </div>
