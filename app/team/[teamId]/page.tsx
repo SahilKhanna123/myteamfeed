@@ -1223,34 +1223,40 @@ export default function TeamFeedPage() {
         <div className="hero">
           <div className="hero-inner">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-              <button className="back-btn" onClick={async () => {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                  await supabase.from('user_team').delete().eq('user_id', user.id)
-                }
-                router.push('/mlb')
-              }}>
-                ⭐ Change Team
-              </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <button className="back-btn" onClick={() => router.push('/')}>
+                    🏆 All Sports
+                  </button>
 
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  router.push('/login')
-                }}
-                style={{
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: 12,
-                  color: '#a1a1aa',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                Sign out
-              </button>
-            </div>
+                  <button className="back-btn" onClick={async () => {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user) {
+                      await supabase.from('user_team').delete().eq('user_id', user.id)
+                    }
+                    router.push('/mlb')
+                  }}>
+                    ⭐ Change Favorite Team
+                  </button>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut()
+                    router.push('/login')
+                  }}
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 12,
+                    color: '#a1a1aa',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
             <div className="team-identity">
                 <div className="team-logo-circle">
                 <Image

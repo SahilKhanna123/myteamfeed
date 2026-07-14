@@ -286,6 +286,29 @@ export default function TeamSelectorPage() {
 
       <div className="page">
         <div className="inner">
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 12,
+                color: "#a1a1aa",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                marginBottom: 24,
+                transition: "color 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#18181b")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#a1a1aa")}
+            >
+              🏆 All Sports
+            </button>
+
+  
           <div className="header">
             <p className="eyebrow">MLB · 2026 Season</p>
             <h1 className="headline">Choose Your <em>Team</em></h1>
