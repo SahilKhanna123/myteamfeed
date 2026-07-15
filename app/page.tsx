@@ -19,7 +19,7 @@ const SPORTS = [
     route: "/nba",
     emoji: "🏀",
     color: "#C9510C",
-    available: false,
+    available: true,
   },
   {
     key: "nfl",
