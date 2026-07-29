@@ -12,9 +12,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "MyTeamFeed",
-  description: "Sports tailored to you",
+  description: "Your team feed app",
+  openGraph: {
+    title: "MyTeamFeed",
+    description: "Your team feed app",
+    url: "https://myteamfeed-9pzq-one.vercel.app",
+    siteName: "MyTeamFeed",
+  },
 };
 
 export default function RootLayout({
